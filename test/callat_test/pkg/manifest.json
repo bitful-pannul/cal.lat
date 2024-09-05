@@ -1,0 +1,15 @@
+[
+    {
+        "process_name": "callat_test",
+        "process_wasm_path": "/callat_test.wasm",
+        "on_exit": "Restart",
+        "request_networking": false,
+        "request_capabilities": [
+            "callat:callat:template.os"
+        ],
+        "grant_capabilities": [
+            "callat:callat:template.os"
+        ],
+        "public": true
+    }
+]
