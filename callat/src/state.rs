@@ -8,15 +8,17 @@ use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Location {
-    pub id: Uuid,
+    pub id: Uuid, // todo remove.
     pub owner: String,
-    pub description: String,
+    pub description: String, // markdown?/html?
     pub time_range: TimeRange,
     pub coordinate: Coordinate,
     #[serde(skip)]
-    pub comments: AutoCommit,
+    pub comments: AutoCommit, // add events here? "wistec was added", "description changed from x to y"
     #[serde(skip)]
     pub members: AutoCommit,
+    // members have write access. need be CRDT or just rawdog it?
+    // your friends, or list of friends, have (might have read access)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Hydrate, Reconcile)]
@@ -34,7 +36,7 @@ pub struct Comments {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TimeRange {
     start: OffsetDateTime,
-    end: OffsetDateTime,
+    end: OffsetDateTime, // option? //None = ongoing
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -62,6 +64,9 @@ impl Location {
         }
     }
 
+    //
+    // older sync -> ayo I'm online again, suync me up:
+    // resolve diffs from foreign members.
     pub fn add_comment(&mut self, author: String, content: String) -> Result<()> {
         let comment = Comment {
             timestamp: OffsetDateTime::now_utc().unix_timestamp(),

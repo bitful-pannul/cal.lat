@@ -11,7 +11,6 @@ wit_bindgen::generate!({
     world: "process-v0",
 });
 
-// hello
 const TIMEOUT: u64 = 30;
 
 #[derive(Serialize, Deserialize)]
