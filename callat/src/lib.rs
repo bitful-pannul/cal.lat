@@ -8,7 +8,9 @@ use state::{Coordinate, Location, State, TimeRange};
 
 wit_bindgen::generate!({
     path: "target/wit",
-    world: "process-v0",
+    world: "callat-template-os-v0",
+    generate_unused_types: true,
+    additional_derives: [PartialEq, serde::Deserialize, serde::Serialize],
 });
 
 const TIMEOUT: u64 = 30;
