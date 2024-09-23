@@ -3,6 +3,7 @@ use kinode_process_lib::{await_message, println, sqlite, Address, Message, Reque
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+mod frontend;
 mod state;
 use state::{Coordinate, Location, State, TimeRange};
 
@@ -95,7 +96,7 @@ fn init(our: Address) {
         }
     };
 
-    // frontend::serve(&our);
+    frontend::serve(&our);
 
     kinode_process_lib::timer::set_timer(30_000, None);
 
