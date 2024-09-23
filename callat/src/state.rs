@@ -1,10 +1,30 @@
 use anyhow::{anyhow, Result};
 use automerge::AutoCommit;
 use autosurgeon::{Hydrate, Reconcile};
+use kinode_process_lib::NodeId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use time::OffsetDateTime;
 use uuid::Uuid;
+
+/// a master record for all entries, both our own and that of friends.
+pub const CREATE_SHARED_DIARY: &str = "CREATE TABLE shared_diary (
+    uuid TEXT PRIMARY KEY,
+	start_date INTEGER NOT NULL,
+	end_date INTEGER,
+	owner TEXT NOT NULL,
+    description TEXT,
+    latitude REAL NOT NULL,
+    longitude REAL NOT NULL,
+);";
+
+pub type Friends = HashMap<NodeId, FriendType>;
+
+pub enum FriendType {
+    Best,         // full granularity: exact dates and times, exact locations
+    CloseFriend,  // time-granularity of "day", location-granularity of "city"
+    Acquaintance, // time-granularity of "week", location-granularity of "country"
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Location {
@@ -65,7 +85,7 @@ impl Location {
     }
 
     //
-    // older sync -> ayo I'm online again, suync me up:
+    // older sync -> ayo I'm online again, sync me up:
     // resolve diffs from foreign members.
     pub fn add_comment(&mut self, author: String, content: String) -> Result<()> {
         let comment = Comment {
@@ -139,7 +159,8 @@ impl Comments {
 }
 
 pub struct State {
-    pub locations: HashMap<Uuid, Location>,
+    pub locations: HashMap<Uuid, Location>, // XX replace with handle for sqlite db
+    pub friends: Friends,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -159,6 +180,7 @@ impl State {
     pub fn new() -> Self {
         State {
             locations: HashMap::new(),
+            friends: Friends::new(),
         }
     }
 

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use kinode_process_lib::{await_message, println, Address, Message, Request, Response};
+use kinode_process_lib::{await_message, println, sqlite, Address, Message, Request, Response};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

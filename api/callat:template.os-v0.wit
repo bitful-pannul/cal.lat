@@ -1,26 +1,5 @@
 interface callat {
-    variant request {
-        new-game(new-game-request),
-        move(move-request),
-        resign(string),
-    }
 
-    variant response {
-        new-game-accepted,
-        new-game-rejected,
-        move-accepted,
-        move-rejected,
-    }
-
-    record new-game-request {
-        white: string,
-        black: string,
-    }
-
-    record move-request {
-        game-id: string,
-        move-str: string,
-    }
 }
 
 world callat-template-os-v0 {
