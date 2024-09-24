@@ -19,6 +19,7 @@ interface Location {
   description: string;
   latitude: number;
   longitude: number;
+  owner: string;
   start_date: number; // Unix timestamp
   end_date: number; // Unix timestamp
 }
@@ -94,8 +95,8 @@ function Home(): JSX.Element {
       if (location.start_date <= endDate && location.end_date >= startDate) {
         const feature = new Feature({
           geometry: new Point(fromLonLat([location.longitude, location.latitude])),
-          name: location.description,
-          location: location
+          name: `${location.description} (${location.owner})`,
+          location: location,
         });
 
         vectorSource.addFeature(feature);
@@ -222,6 +223,8 @@ function Home(): JSX.Element {
                 >
                   <strong>{location.description}</strong>
                   <br />
+                  <em>{location.owner}</em>
+                  <br />
                   {startDate} - {endDate}
                 </li>
               );
@@ -232,7 +235,7 @@ function Home(): JSX.Element {
       </div>
       {selectedLocation && (
         <div className="location-details">
-          <h3>{selectedLocation.description}</h3>
+          <h3>{selectedLocation.owner}: {selectedLocation.description}</h3>
           <p>Coordinates: ({selectedLocation.latitude.toFixed(4)}, {selectedLocation.longitude.toFixed(4)})</p>
           <p>Date: {new Date(selectedLocation.start_date * 1000).toLocaleDateString()} - {new Date(selectedLocation.end_date * 1000).toLocaleDateString()}</p>
         </div>
