@@ -7,11 +7,13 @@
         "request_capabilities": [
             "homepage:homepage:sys",
             "http_server:distro:sys",
-            "vfs:distro:sys"
+            "vfs:distro:sys",
+            "sqlite:distro:sys"
         ],
         "grant_capabilities": [
             "http_server:distro:sys",
-            "timer:distro:sys"
+            "timer:distro:sys",
+            "sqlite:distro:sys"
         ],
         "public": false
     }

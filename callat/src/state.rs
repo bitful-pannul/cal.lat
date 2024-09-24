@@ -1,265 +1,197 @@
 use anyhow::{anyhow, Result};
-use automerge::AutoCommit;
-use autosurgeon::{Hydrate, Reconcile};
-use kinode_process_lib::NodeId;
+// use chrono::{DateTime, Utc}; these are all annoying
+use kinode_process_lib::{
+    sqlite::{self, Sqlite},
+    Address, NodeId,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use time::OffsetDateTime;
 use uuid::Uuid;
 
-/// a master record for all entries, both our own and that of friends.
-pub const CREATE_SHARED_DIARY: &str = "CREATE TABLE shared_diary (
-    uuid TEXT PRIMARY KEY,
-	start_date INTEGER NOT NULL,
-	end_date INTEGER,
-	owner TEXT NOT NULL,
-    description TEXT,
-    latitude REAL NOT NULL,
-    longitude REAL NOT NULL,
-);";
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Location {
+    pub uuid: Uuid,
+    pub start_date: i64, // Store as Unix timestamp?
+    pub end_date: i64,   // Store as Unix timestamp?
+    pub owner: NodeId,
+    pub description: String,
+    pub latitude: f64,
+    pub longitude: f64,
+}
 
-pub type Friends = HashMap<NodeId, FriendType>;
-
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FriendType {
     Best,         // full granularity: exact dates and times, exact locations
     CloseFriend,  // time-granularity of "day", location-granularity of "city"
     Acquaintance, // time-granularity of "week", location-granularity of "country"
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Location {
-    pub id: Uuid, // todo remove.
-    pub owner: String,
-    pub description: String, // markdown?/html?
-    pub time_range: TimeRange,
-    pub coordinate: Coordinate,
-    #[serde(skip)]
-    pub comments: AutoCommit, // add events here? "wistec was added", "description changed from x to y"
-    #[serde(skip)]
-    pub members: AutoCommit,
-    // members have write access. need be CRDT or just rawdog it?
-    // your friends, or list of friends, have (might have read access)
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Hydrate, Reconcile)]
-pub struct Comment {
-    timestamp: i64, // unix timestamp
-    author: String,
-    content: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Hydrate, Reconcile)]
-pub struct Comments {
-    comments: Vec<Comment>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TimeRange {
-    start: OffsetDateTime,
-    end: OffsetDateTime, // option? //None = ongoing
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Coordinate {
-    latitude: f64,
-    longitude: f64,
-}
-
-impl Location {
-    pub fn new(
-        id: Uuid,
-        owner: String,
-        description: String,
-        time_range: TimeRange,
-        coordinate: Coordinate,
-    ) -> Self {
-        Location {
-            id,
-            owner,
-            description,
-            time_range,
-            coordinate,
-            comments: AutoCommit::new(),
-            members: AutoCommit::new(),
-        }
-    }
-
-    //
-    // older sync -> ayo I'm online again, sync me up:
-    // resolve diffs from foreign members.
-    pub fn add_comment(&mut self, author: String, content: String) -> Result<()> {
-        let comment = Comment {
-            timestamp: OffsetDateTime::now_utc().unix_timestamp(),
-            author,
-            content,
-        };
-        let mut comments: Comments =
-            autosurgeon::hydrate(&self.comments).unwrap_or_else(|_| Comments::new());
-        comments.comments.push(comment);
-        autosurgeon::reconcile(&mut self.comments, &comments)?;
-        Ok(())
-    }
-
-    pub fn get_comments(&self) -> Result<Vec<Comment>> {
-        let comments: Comments =
-            autosurgeon::hydrate(&self.comments).unwrap_or_else(|_| Comments::new());
-        Ok(comments.comments)
-    }
-
-    pub fn add_member(&mut self, member: String) -> Result<()> {
-        let mut members: Vec<String> = autosurgeon::hydrate(&self.members).unwrap_or_default();
-        if !members.contains(&member) {
-            members.push(member);
-            autosurgeon::reconcile(&mut self.members, &members)?;
-        }
-        Ok(())
-    }
-
-    pub fn remove_member(&mut self, member: &str) -> Result<()> {
-        let mut members: Vec<String> = autosurgeon::hydrate(&self.members).unwrap_or_default();
-        members.retain(|m| m != member);
-        autosurgeon::reconcile(&mut self.members, &members)?;
-        Ok(())
-    }
-
-    pub fn is_member(&self, member: &str) -> Result<bool> {
-        let members: Vec<String> = autosurgeon::hydrate(&self.members).unwrap_or_default();
-        Ok(members.contains(&member.to_string()))
-    }
-
-    pub fn set_description(&mut self, description: String) {
-        self.description = description;
-    }
-
-    pub fn set_time_range(&mut self, time_range: TimeRange) {
-        self.time_range = time_range;
-    }
-
-    pub fn set_coordinate(&mut self, coordinate: Coordinate) {
-        self.coordinate = coordinate;
-    }
-
-    pub fn serialize_crdt_data(&mut self) -> Result<(Vec<u8>, Vec<u8>)> {
-        Ok((self.comments.save(), self.members.save()))
-    }
-
-    pub fn deserialize_crdt_data(&mut self, comments: &[u8], members: &[u8]) -> Result<()> {
-        self.comments = AutoCommit::load(comments)?;
-        self.members = AutoCommit::load(members)?;
-        Ok(())
-    }
-}
-
-impl Comments {
-    pub fn new() -> Self {
-        Comments {
-            comments: Vec::new(),
-        }
-    }
-}
+pub type Friends = HashMap<NodeId, FriendType>;
 
 pub struct State {
-    pub locations: HashMap<Uuid, Location>, // XX replace with handle for sqlite db
+    pub db: DB,
     pub friends: Friends,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SerializableState {
-    pub locations: HashMap<Uuid, SerializableLocation>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SerializableLocation {
-    #[serde(flatten)]
-    pub location: Location,
-    pub comments: Vec<u8>,
-    pub members: Vec<u8>,
-}
-
 impl State {
-    pub fn new() -> Self {
-        State {
-            locations: HashMap::new(),
-            friends: Friends::new(),
-        }
+    pub fn new(our: &Address) -> Result<Self> {
+        Ok(Self {
+            db: DB::connect(our)?,
+            friends: HashMap::new(),
+        })
     }
 
-    pub fn add_location(&mut self, location: Location) {
-        self.locations.insert(location.id, location);
+    pub fn add_location(&mut self, location: Location) -> Result<()> {
+        self.db.insert_location(&location)
     }
 
-    pub fn get_location(&self, id: &Uuid) -> Option<&Location> {
-        self.locations.get(id)
+    pub fn update_location(&mut self, location: Location) -> Result<()> {
+        self.db.update_location(&location)
     }
 
-    pub fn get_location_mut(&mut self, id: &Uuid) -> Option<&mut Location> {
-        self.locations.get_mut(id)
+    pub fn get_location(&self, uuid: &Uuid) -> Result<Option<Location>> {
+        self.db.get_location(uuid)
     }
 
-    pub fn remove_location(&mut self, id: &Uuid) -> Option<Location> {
-        self.locations.remove(id)
+    pub fn get_all_locations(&self) -> Result<Vec<Location>> {
+        self.db.get_all_locations()
     }
 
-    pub fn add_comment_to_location(
-        &mut self,
-        location_id: &Uuid,
-        author: String,
-        content: String,
-    ) -> Result<()> {
-        self.locations
-            .get_mut(location_id)
-            .ok_or_else(|| anyhow!("Location not found"))?
-            .add_comment(author, content)
+    pub fn get_locations_in_range(&self, start: i64, end: i64) -> Result<Vec<Location>> {
+        self.db.get_locations_in_range(start, end)
     }
 
-    pub fn add_member_to_location(&mut self, location_id: &Uuid, member: String) -> Result<()> {
-        self.locations
-            .get_mut(location_id)
-            .ok_or_else(|| anyhow!("Location not found"))?
-            .add_member(member)
+    pub fn add_friend(&mut self, node_id: NodeId, friend_type: FriendType) {
+        self.friends.insert(node_id, friend_type);
     }
 
-    pub fn remove_member_from_location(&mut self, location_id: &Uuid, member: &str) -> Result<()> {
-        self.locations
-            .get_mut(location_id)
-            .ok_or_else(|| anyhow!("Location not found"))?
-            .remove_member(member)
+    pub fn remove_friend(&mut self, node_id: &NodeId) {
+        self.friends.remove(node_id);
     }
 
-    pub fn serialize(&mut self) -> Result<Vec<u8>> {
-        let serializable_state = SerializableState {
-            locations: self
-                .locations
-                .iter_mut()
-                .map(|(id, location)| {
-                    let (comments, members) = location
-                        .serialize_crdt_data()
-                        .expect("Failed to serialize CRDT data");
-                    (
-                        *id,
-                        SerializableLocation {
-                            location: location.clone(),
-                            comments,
-                            members,
-                        },
-                    )
-                })
-                .collect(),
-        };
-        Ok(serde_json::to_vec(&serializable_state)?)
-    }
-
-    pub fn deserialize(data: &[u8]) -> Result<Self> {
-        let serializable_state: SerializableState = serde_json::from_slice(data)?;
-        let mut state = State::new();
-        for (id, serializable_location) in serializable_state.locations {
-            let mut location = serializable_location.location;
-            location.deserialize_crdt_data(
-                &serializable_location.comments,
-                &serializable_location.members,
-            )?;
-            state.locations.insert(id, location);
-        }
-        Ok(state)
+    pub fn get_friend_type(&self, node_id: &NodeId) -> Option<&FriendType> {
+        self.friends.get(node_id)
     }
 }
+
+pub struct DB {
+    pub inner: Sqlite,
+}
+
+impl DB {
+    pub fn connect(our: &Address) -> Result<Self> {
+        let inner = sqlite::open(our.package_id(), "nomad_social.sqlite", Some(10))?;
+        inner.write(CREATE_LOCATIONS_TABLE.to_string(), vec![], None)?;
+        Ok(Self { inner })
+    }
+
+    pub fn insert_location(&self, location: &Location) -> Result<()> {
+        let query = "INSERT INTO locations (uuid, start_date, end_date, owner, description, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        let params = vec![
+            location.uuid.to_string().into(),
+            location.start_date.into(),
+            location.end_date.into(),
+            location.owner.to_string().into(),
+            location.description.clone().into(),
+            location.latitude.into(),
+            location.longitude.into(),
+        ];
+        self.inner.write(query.to_string(), params, None)?;
+        Ok(())
+    }
+
+    pub fn update_location(&self, location: &Location) -> Result<()> {
+        let query = "UPDATE locations SET start_date = ?, end_date = ?, description = ?, latitude = ?, longitude = ? WHERE uuid = ?";
+        let params = vec![
+            location.start_date.into(),
+            location.end_date.into(),
+            location.description.clone().into(),
+            location.latitude.into(),
+            location.longitude.into(),
+            location.uuid.to_string().into(),
+        ];
+        self.inner.write(query.to_string(), params, None)?;
+        Ok(())
+    }
+
+    pub fn get_all_locations(&self) -> Result<Vec<Location>> {
+        let query = "SELECT * FROM locations";
+        let results = self.inner.read(query.to_string(), vec![])?;
+        results
+            .into_iter()
+            .map(|row| self.row_to_location(&row))
+            .collect()
+    }
+
+    pub fn get_location(&self, uuid: &Uuid) -> Result<Option<Location>> {
+        let query = "SELECT * FROM locations WHERE uuid = ?";
+        let params = vec![uuid.to_string().into()];
+        let results = self.inner.read(query.to_string(), params)?;
+        if let Some(row) = results.get(0) {
+            Ok(Some(self.row_to_location(row)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_locations_in_range(&self, start: i64, end: i64) -> Result<Vec<Location>> {
+        let query =
+            "SELECT * FROM locations WHERE start_date <= ? AND (end_date >= ? OR end_date IS NULL)";
+        let params = vec![end.into(), start.into()];
+        let results = self.inner.read(query.to_string(), params)?;
+        results
+            .into_iter()
+            .map(|row| self.row_to_location(&row))
+            .collect()
+    }
+
+    fn row_to_location(&self, row: &HashMap<String, serde_json::Value>) -> Result<Location> {
+        Ok(Location {
+            uuid: Uuid::parse_str(
+                row["uuid"]
+                    .as_str()
+                    .ok_or_else(|| anyhow::anyhow!("Invalid UUID"))?,
+            )?,
+            start_date: row["start_date"]
+                .as_i64()
+                .ok_or_else(|| anyhow::anyhow!("Invalid start_date"))?,
+            end_date: row["end_date"]
+                .as_i64()
+                .ok_or_else(|| anyhow::anyhow!("Invalid end_date"))?,
+            owner: row["owner"]
+                .as_str()
+                .ok_or_else(|| anyhow!("Invalid owner"))?
+                .parse()?,
+            description: row["description"]
+                .as_str()
+                .ok_or_else(|| anyhow!("Invalid description"))?
+                .to_string(),
+            latitude: row["latitude"]
+                .as_f64()
+                .ok_or_else(|| anyhow!("Invalid latitude"))?,
+            longitude: row["longitude"]
+                .as_f64()
+                .ok_or_else(|| anyhow!("Invalid longitude"))?,
+        })
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewLocation {
+    pub start_date: i64,
+    pub end_date: i64,
+    pub description: String,
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+const CREATE_LOCATIONS_TABLE: &str = "
+CREATE TABLE IF NOT EXISTS locations (
+    uuid TEXT PRIMARY KEY,
+    start_date INTEGER NOT NULL,
+    end_date INTEGER,
+    owner TEXT NOT NULL,
+    description TEXT,
+    latitude REAL NOT NULL,
+    longitude REAL NOT NULL
+);";

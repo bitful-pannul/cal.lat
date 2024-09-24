@@ -66,6 +66,10 @@ export default defineConfig({
           return '/favorite';
         },
       },
+      [`^${BASE_URL}/api/.*`]: {
+        target: PROXY_URL,
+        changeOrigin: true,
+      },
       [`^${BASE_URL}/(?!(@vite/client|src/.*|node_modules/.*|@react-refresh|$))`]: {
         target: PROXY_URL,
         changeOrigin: true,
