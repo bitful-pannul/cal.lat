@@ -1,5 +1,7 @@
 use anyhow::Result;
-use kinode_process_lib::{await_message, println, sqlite, Address, Message, Request, Response};
+use kinode_process_lib::{
+    await_message, http, println, sqlite, Address, Message, Request, Response,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -96,18 +98,22 @@ fn init(our: Address) {
         }
     };
 
-    frontend::serve(&our);
+    let mut server = frontend::serve(&our);
 
     kinode_process_lib::timer::set_timer(30_000, None);
 
     loop {
-        handle_message(&our, &mut state)
+        handle_message(&our, &mut state, &mut server)
             .map_err(|e| println!("error: {:?}", e))
             .ok();
     }
 }
 
-fn handle_message(our: &Address, state: &mut State) -> Result<()> {
+fn handle_message(
+    our: &Address,
+    state: &mut State,
+    server: &mut http::server::HttpServer,
+) -> Result<()> {
     match await_message() {
         Ok(message) => {
             if message.is_local(our) {
@@ -118,7 +124,7 @@ fn handle_message(our: &Address, state: &mut State) -> Result<()> {
                     Ok(())
                 } else if message.is_process("http_server:distro:sys") {
                     // Assume frontend::handle_http_request is implemented elsewhere
-                    // frontend::handle_http_request(our, message, state, ws_channels)
+                    frontend::handle_request(server, &message)?;
                     Ok(())
                 } else if message.is_request() {
                     let request: LocalLocationRequest = serde_json::from_slice(message.body())?;
