@@ -6,7 +6,7 @@ pub fn serve(our: &Address) {
     server
         .serve_ui(
             our,
-            "/ui",
+            "ui",
             vec!["/"],
             http::server::HttpBindingConfig::default(),
         )

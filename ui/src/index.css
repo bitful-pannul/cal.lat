@@ -1,3 +1,5 @@
+@import "../node_modules/ol/ol.css";
+
 h1,
 h2,
 h3,
@@ -11,4 +13,17 @@ input,
 textarea,
 span {
   font-family: "Kode Mono", monospace;
+}
+
+#title {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: var(--tasteful-dark);
+  mix-blend-mode: difference;
+}
+
+#map {
+  width: 100vw;
+  height: 100vh;
 }
