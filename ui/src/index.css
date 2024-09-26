@@ -1,57 +1,90 @@
 @import "../node_modules/ol/ol.css";
+@import "../node_modules/react-big-calendar/lib/css/react-big-calendar.css";
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-p,
-a,
-button,
-input,
-textarea,
-span {
-  font-family: "Kode Mono", monospace;
-}
-
-#title {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  color: var(--tasteful-dark);
-  mix-blend-mode: difference;
-}
-
-#map {
-  width: 100vw;
-  height: 100vh;
+body {
+  font-family: 'Arial', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f0f2f5;
 }
 
 .container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-  position: relative;
+  height: 100vh;
+}
+
+.title {
+  text-align: center;
+  color: #333;
+  margin: 20px 0;
+}
+
+.tab-controls {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.tab-controls button {
+  padding: 10px 20px;
+  margin: 0 10px;
+  border: none;
+  background-color: #f0f0f0;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+}
+
+.tab-controls button.active {
+  background-color: #3498db;
+  color: white;
 }
 
 .content {
   display: flex;
-  width: 100%;
+  flex: 1;
+  padding: 0 20px;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-right: 20px;
+}
+
+.map-view,
+.calendar-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-container {
+  flex: 1;
+  min-height: 400px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.slider-container {
+  padding: 20px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  margin: 0 20px 20px;
 }
 
 .date-range-slider {
   width: 100%;
-  padding: 20px 0;
 }
 
 .date-inputs {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 20px;
 }
 
 .date-inputs input {
@@ -60,37 +93,41 @@ span {
   border-radius: 4px;
 }
 
-.slider {
+.slider-track {
+  position: relative;
   width: 100%;
-  margin: 10px 0;
+  height: 4px;
+  background-color: #e0e0e0;
+  margin: 20px 0;
 }
 
-.start-slider {
-  background: linear-gradient(to right, #3498db 0%, #3498db 50%, #e0e0e0 50%, #e0e0e0 100%);
+.slider-range {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background-color: rgba(52, 152, 219, 0.3);
 }
 
-.end-slider {
-  background: linear-gradient(to right, #e0e0e0 0%, #e0e0e0 50%, #3498db 50%, #3498db 100%);
-}
-
-.map-container {
-  flex: 1;
-  height: 400px;
-  margin-bottom: 20px;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  background-color: #3498db;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .sidebar {
   width: 300px;
-  max-height: 70vh;
-  overflow-y: auto;
   background-color: white;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  margin-left: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
 }
 
 .locations-list {
@@ -101,30 +138,23 @@ span {
 .location-item {
   margin-bottom: 15px;
   padding: 10px;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s;
 }
 
 .location-item:hover {
   background-color: #f5f5f5;
 }
 
-.location-item.selected {
-  background-color: #e0e0e0;
-}
-
 .location-details {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
   background-color: white;
   padding: 15px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  max-width: 300px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
+.back-button,
 .add-location-btn {
   display: block;
   width: 100%;
@@ -133,9 +163,15 @@ span {
   background-color: #3498db;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
   text-align: center;
+  transition: background-color 0.3s;
+}
+
+.back-button:hover,
+.add-location-btn:hover {
+  background-color: #2980b9;
 }
 
 .popup {
@@ -145,21 +181,21 @@ span {
   transform: translate(-50%, -50%);
   background-color: white;
   padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   z-index: 1000;
 }
 
 .popup form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 15px;
 }
 
 .popup input {
-  padding: 5px;
+  padding: 10px;
   border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: 5px;
 }
 
 .popup button {
@@ -167,19 +203,125 @@ span {
   background-color: #3498db;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.popup button:hover {
+  background-color: #2980b9;
 }
 
 .popup button[type="button"] {
   background-color: #e74c3c;
 }
 
-@media (max-width: 768px) {
-  .container {
-    padding: 10px;
-  }
+.popup button[type="button"]:hover {
+  background-color: #c0392b;
+}
 
+.view-controls {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.view-controls button {
+  padding: 5px 10px;
+  margin: 0 5px;
+  border: none;
+  background-color: #f0f0f0;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+}
+
+.view-controls button.active {
+  background-color: #3498db;
+  color: white;
+}
+
+.waterfall-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.waterfall-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 0;
+  background-color: #f0f0f0;
+  border-bottom: 1px solid #ddd;
+}
+
+.waterfall-controls button {
+  padding: 5px 10px;
+  margin: 0 5px;
+  border: none;
+  background-color: #3498db;
+  color: white;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.waterfall-controls button:hover {
+  background-color: #2980b9;
+}
+
+.waterfall-controls span {
+  margin: 0 10px;
+  font-weight: bold;
+}
+
+.waterfall-view-wrapper {
+  flex-grow: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.waterfall-view {
+  position: relative;
+  height: 100%;
+  min-width: 100%;
+}
+
+.waterfall-item {
+  position: absolute;
+  height: 25px;
+  background-color: #3498db;
+  color: white;
+  padding: 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.waterfall-item:hover {
+  background-color: #2980b9;
+}
+
+.waterfall-item-content {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.date-range {
+  margin-left: 10px;
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+@media (max-width: 768px) {
   .content {
     flex-direction: column;
   }
@@ -191,17 +333,5 @@ span {
   .sidebar {
     width: 100%;
     margin-top: 20px;
-  }
-
-  .location-details {
-    position: static;
-    margin-top: 20px;
-    max-width: none;
-  }
-
-  .add-location-btn {
-    position: static;
-    display: block;
-    margin: 20px auto;
   }
 }
