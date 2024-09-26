@@ -111,7 +111,10 @@ function Home(): JSX.Element {
             </div>
           )}
           {activeTab === 'calendar' && (
-            <CalendarView locations={locations} onSelectLocation={setSelectedLocation} />
+            <CalendarView
+              locations={locations}
+              onSelectLocation={setSelectedLocation}
+            />
           )}
         </div>
         <div className="sidebar">

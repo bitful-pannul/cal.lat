@@ -220,12 +220,73 @@ body {
   background-color: #c0392b;
 }
 
-.waterfall-view {
-  position: relative;
+.view-controls {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.view-controls button {
+  padding: 5px 10px;
+  margin: 0 5px;
+  border: none;
+  background-color: #f0f0f0;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+}
+
+.view-controls button.active {
+  background-color: #3498db;
+  color: white;
+}
+
+.waterfall-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.waterfall-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 0;
+  background-color: #f0f0f0;
+  border-bottom: 1px solid #ddd;
+}
+
+.waterfall-controls button {
+  padding: 5px 10px;
+  margin: 0 5px;
+  border: none;
+  background-color: #3498db;
+  color: white;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.waterfall-controls button:hover {
+  background-color: #2980b9;
+}
+
+.waterfall-controls span {
+  margin: 0 10px;
+  font-weight: bold;
+}
+
+.waterfall-view-wrapper {
+  flex-grow: 1;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 20px 0;
-  margin-bottom: 20px;
+}
+
+.waterfall-view {
+  position: relative;
+  height: 100%;
+  min-width: 100%;
 }
 
 .waterfall-item {
