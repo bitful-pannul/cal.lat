@@ -9,9 +9,11 @@ anyhow = "1.0"
 automerge = "0.5.9"
 autosurgeon = "0.8.3"
 bincode = "1.3.3"
+chrono = "0.4.38"
 chrono-tz = "0.6"
 kinode_process_lib = { git = "https://github.com/kinode-dao/process_lib", tag = "v0.9.1" }
 process_macros = { git = "https://github.com/kinode-dao/process_macros", rev = "626e501" }
+rstar = "0.12.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 time = { version = "0.3", features = ["serde"] }

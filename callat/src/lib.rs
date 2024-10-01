@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 mod frontend;
+mod geocity;
 mod state;
 use state::{Location, State};
 
