@@ -1,7 +1,9 @@
+use std::str::FromStr;
+
 use anyhow::Result;
-use kinode_process_lib::{await_message, http, println, Address, Message, Request, Response};
+use kinode::process::standard::NodeId;
+use kinode_process_lib::{await_message, http, println, Address, Message, ProcessId, Request};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 mod frontend;
 mod geocity;
@@ -17,38 +19,15 @@ wit_bindgen::generate!({
 
 const TIMEOUT: u64 = 30;
 
-#[derive(Serialize, Deserialize)]
-pub enum LocationRequest {
-    Local(LocalLocationRequest),
-    Remote(RemoteLocationRequest),
-}
-//
+// Local requests like adding a friend, updating a location, etc.
+// are handled by http methods in frontend.rs.
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum LocalLocationRequest {
-    NewLocation(Location),
-    RemoveLocation(Uuid),
-    UpdateLocation(Location),
-    CreateInvite(Uuid, Address),
-    AcceptInvite(Uuid),
-    RejectInvite(Uuid),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum RemoteLocationRequest {
-    Sync {
-        location_id: Uuid,
-        data: Vec<u8>,
-    },
-    Invite {
-        location_id: Uuid,
-        name: String,
-        data: Vec<u8>,
-    },
-    InviteResponse {
-        location_id: Uuid,
-        accepted: bool,
-    },
+pub enum RemoteRequest {
+    Ping,                              // request remote node to update us
+    Sync { locations: Vec<Location> }, // message, spinning sync until received?
+    FriendRequest,
+    FriendResponse,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -93,10 +72,6 @@ fn handle_message(
                 } else if message.is_process("http_server:distro:sys") {
                     frontend::handle_request(our, server, &message, state)?;
                     Ok(())
-                } else if message.is_request() {
-                    let request: LocalLocationRequest = serde_json::from_slice(message.body())?;
-                    handle_local_request(our, request, state)?;
-                    Ok(())
                 } else {
                     Ok(())
                 }
@@ -119,84 +94,51 @@ fn handle_message(
     }
 }
 
-fn handle_local_request(
-    our: &Address,
-    request: LocalLocationRequest,
-    state: &mut State,
-) -> Result<()> {
-    match request {
-        LocalLocationRequest::NewLocation(location) => {
-            state.add_location(location)?;
-        }
-        LocalLocationRequest::RemoveLocation(location_id) => {
-            // state.remove_location(&location_id)?;
-        }
-        LocalLocationRequest::UpdateLocation(location) => {
-            state.update_location(location)?;
-        }
-        LocalLocationRequest::CreateInvite(location_id, address) => {
-            if let Some(location) = state.get_location(&location_id)? {
-                let data = serde_json::to_vec(&location)?;
-                Request::to(&address)
-                    .body(serde_json::to_vec(&RemoteLocationRequest::Invite {
-                        location_id,
-                        name: location.description.clone(),
-                        data,
-                    })?)
-                    .context(address.to_string())
-                    .expects_response(TIMEOUT)
+fn handle_remote_message(our: &Address, message: Message, state: &mut State) -> Result<()> {
+    let sender: NodeId = message.source().node().into();
+
+    match serde_json::from_slice::<RemoteRequest>(message.body())? {
+        RemoteRequest::Ping => {
+            println!("Received ping from {}", sender);
+
+            // if node is a friend, get it's status and give it our latest locations
+            if let Some(friend) = state.get_friend(&sender) {
+                let locations = state.get_locations_by_owner(&our.node().into())?;
+
+                // for each location, fuzz the date and location and send to friend,
+                // only our own locations for now, can gossip around others as well..
+                let fuzzed_locations = state
+                    .geo_protocol
+                    .fuzz_locations(locations, &friend.friend_type);
+
+                let req = RemoteRequest::Sync {
+                    locations: fuzzed_locations,
+                };
+
+                let address = Address::new(sender, ProcessId::from_str(our.process()).unwrap());
+
+                Request::to(address)
+                    .body(serde_json::to_vec(&req)?)
                     .send()?;
             }
         }
-        LocalLocationRequest::AcceptInvite(_location_id) => {
-            // Implement invite acceptance logic
+        RemoteRequest::Sync { locations } => {
+            println!("Received sync data for {} locations", locations.len());
+
+            for location in locations {
+                state.add_location(location)?;
+            }
+            // push notifs?
         }
-        LocalLocationRequest::RejectInvite(_location_id) => {
-            // Implement invite rejection logic
+        RemoteRequest::FriendRequest => {
+            println!("Received friend request from {}", sender);
+            state.add_pending_friend_request(sender);
+            // push notifs here would be pretty cool no?
+        }
+        RemoteRequest::FriendResponse => {
+            println!("Received friend response from {}", sender);
+            state.handle_friend_response(sender);
         }
     }
-    Ok(())
-}
-
-fn handle_remote_message(our: &Address, message: Message, state: &mut State) -> Result<()> {
-    match serde_json::from_slice::<RemoteLocationRequest>(message.body())? {
-        RemoteLocationRequest::Sync { location_id, data } => {
-            // if let Some(location) = state.get_location_mut(&location_id)? {
-            //     // Implement CRDT merge logic here
-            //     println!("Received sync data for location: {}", location_id);
-            // } else {
-            //     return respond_with_err(LocationError::UnknownLocation);
-            // }
-        }
-        RemoteLocationRequest::Invite {
-            location_id,
-            name: _,
-            data,
-        } => {
-            let location: Location = serde_json::from_slice(&data)?;
-            state.add_location(location)?;
-            println!("Received invite for location: {}", location_id);
-        }
-        RemoteLocationRequest::InviteResponse {
-            location_id,
-            accepted,
-        } => {
-            println!(
-                "Received invite response for location: {}, accepted: {}",
-                location_id, accepted
-            );
-            // Implement invite response logic
-        }
-    }
-    Response::new()
-        .body(serde_json::to_vec(&LocationResponse::Ok(()))?)
-        .send()?;
-    Ok(())
-}
-
-fn respond_with_err(err: LocationError) -> Result<()> {
-    Response::new()
-        .body(serde_json::to_vec(&LocationResponse::Err(err))?)
-        .send()?;
     Ok(())
 }

@@ -2,7 +2,7 @@ use kinode_process_lib::{vfs, Address};
 use rstar::{PointDistance, RTree, RTreeObject, AABB};
 use serde::{Deserialize, Serialize};
 
-use crate::state::FriendType;
+use crate::state::{FriendType, Location};
 
 pub fn load_cities_from_file(our: &Address) -> anyhow::Result<Vec<City>> {
     let file_path = format!("{}/pkg/10cities.json", our.package_id());
@@ -51,31 +51,43 @@ impl GranularityProtocol {
         self.city_tree.nearest_neighbor(&[longitude, latitude])
     }
 
-    pub fn fuzz_location(
+    pub fn fuzz_locations(
         &self,
-        longitude: f64,
-        latitude: f64,
+        locations: Vec<Location>,
         friend_type: &FriendType,
-    ) -> (f64, f64) {
-        match friend_type {
-            FriendType::Best => (longitude, latitude), // exact location
+    ) -> Vec<Location> {
+        locations
+            .into_iter()
+            .map(|location| self.fuzz_location(location, friend_type))
+            .collect()
+    }
+
+    pub fn fuzz_location(&self, location: Location, friend_type: &FriendType) -> Location {
+        let (fuzzed_longitude, fuzzed_latitude) = match friend_type {
+            FriendType::Best => (location.longitude, location.latitude), // exact location
             FriendType::CloseFriend => {
                 // return coordinates of the nearest city
-                if let Some(city) = self.closest_city(longitude, latitude) {
+                if let Some(city) = self.closest_city(location.longitude, location.latitude) {
                     (city.longitude, city.latitude)
                 } else {
-                    (longitude, latitude) // fallback to exact location if no city found
+                    (location.longitude, location.latitude) // fallback to exact location if no city found
                 }
             }
             FriendType::Acquaintance => {
                 // return coordinates of the nearest country
                 // todo: add random country centroid
-                if let Some(city) = self.closest_city(longitude, latitude) {
+                if let Some(city) = self.closest_city(location.longitude, location.latitude) {
                     (city.longitude, city.latitude)
                 } else {
-                    (longitude, latitude) // Fallback to exact location if no city found
+                    (location.longitude, location.latitude) // fallback to exact location if no city found
                 }
             }
+        };
+
+        Location {
+            longitude: fuzzed_longitude,
+            latitude: fuzzed_latitude,
+            ..location
         }
     }
 }

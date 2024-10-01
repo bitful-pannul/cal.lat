@@ -2,13 +2,18 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, Datelike, Duration, Utc};
 use kinode_process_lib::{
     sqlite::{self, Sqlite},
-    Address, NodeId,
+    Address, NodeId, ProcessId, Request,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use uuid::Uuid;
 
-use crate::geocity::{load_cities_from_file, GranularityProtocol};
+use crate::{
+    geocity::{load_cities_from_file, GranularityProtocol},
+    RemoteRequest,
+};
+
+const PROCESS_ID: &str = "callat:callat:template.os";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Location {
@@ -28,25 +33,21 @@ pub enum FriendType {
     Acquaintance, // time-granularity of "week", location-granularity of "country"
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub enum FriendStatus {
-    Pending,
-    Accepted,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Friend {
     pub node_id: NodeId,
     pub friend_type: FriendType,
-    pub status: FriendStatus,
+    pub last_pinged: i64, // unix timestamp
 }
 
 pub type Friends = HashMap<NodeId, Friend>;
-pub type CustomLists = HashMap<String, Vec<NodeId>>;
+pub type CustomLists = HashMap<String, Vec<NodeId>>; // not in active use yet.
+pub type PendingFriendRequests = Vec<(Friend, bool)>; // (node_id, is_local)
 
 pub struct State {
     pub db: DB,
     pub friends: Friends,
+    pub pending_friend_requests: PendingFriendRequests,
     pub custom_lists: CustomLists,
     pub geo_protocol: GranularityProtocol,
 }
@@ -57,6 +58,7 @@ impl State {
         Ok(Self {
             db: DB::connect(our)?,
             friends: HashMap::new(),
+            pending_friend_requests: Vec::new(),
             custom_lists: HashMap::new(),
             geo_protocol: GranularityProtocol::new(cities),
         })
@@ -82,30 +84,122 @@ impl State {
         self.db.get_locations_in_range(start, end)
     }
 
-    pub fn add_friend(&mut self, node_id: NodeId, friend_type: FriendType, status: FriendStatus) {
+    pub fn get_locations_by_owner(&self, owner: &NodeId) -> Result<Vec<Location>> {
+        self.db.get_locations_by_owner(owner)
+    }
+
+    pub fn ping_node(&mut self, node_id: NodeId) {
+        if let Some(friend) = self.friends.get_mut(&node_id) {
+            friend.last_pinged = Utc::now().timestamp();
+        }
+        Request::to(Address::new(
+            node_id,
+            ProcessId::from_str(PROCESS_ID).unwrap(),
+        ))
+        .body(serde_json::to_vec(&RemoteRequest::Ping).unwrap())
+        .send()
+        .unwrap();
+    }
+
+    pub fn add_friend(&mut self, node_id: NodeId, friend_type: FriendType) {
         self.friends.insert(
             node_id.clone(),
             Friend {
                 node_id,
                 friend_type,
-                status,
+                last_pinged: Utc::now().timestamp(),
             },
         );
     }
 
-    pub fn accept_friend(&mut self, node_id: NodeId) -> Result<()> {
-        if let Some(friend) = self.friends.get_mut(&node_id) {
-            if friend.status == FriendStatus::Pending {
-                friend.status = FriendStatus::Accepted;
+    pub fn send_friend_request(&mut self, node_id: NodeId, friend_type: FriendType) {
+        self.pending_friend_requests.push((
+            Friend {
+                node_id: node_id.clone(),
+                friend_type,
+                last_pinged: Utc::now().timestamp(),
+            },
+            true, // is_local
+        ));
+        Request::to(Address::new(
+            node_id,
+            ProcessId::from_str(PROCESS_ID).unwrap(),
+        ))
+        .body(serde_json::to_vec(&RemoteRequest::FriendRequest).unwrap())
+        .send()
+        .unwrap();
+    }
+
+    pub fn add_pending_friend_request(&mut self, node_id: NodeId) {
+        self.pending_friend_requests.push((
+            Friend {
+                node_id,
+                friend_type: FriendType::Acquaintance, // default, user can choose other when confirming.
+                last_pinged: Utc::now().timestamp(),
+            },
+            false, // is_local
+        ));
+    }
+
+    pub fn accept_friend_request(
+        &mut self,
+        node_id: NodeId,
+        friend_type: FriendType,
+    ) -> Result<()> {
+        if let Some(index) = self
+            .pending_friend_requests
+            .iter()
+            .position(|(friend, _)| friend.node_id == node_id)
+        {
+            let (friend, is_local) = self.pending_friend_requests.remove(index);
+            if !is_local {
+                self.add_friend(friend.node_id, friend_type);
                 Ok(())
             } else {
-                Err(anyhow!("Friend request is not pending"))
+                Err(anyhow!("Cannot accept a local friend request"))
             }
         } else {
-            Err(anyhow!("No friend found for the given NodeId"))
+            Err(anyhow!(
+                "No pending friend request found for the given NodeId"
+            ))
         }
     }
 
+    pub fn reject_friend_request(&mut self, node_id: NodeId) {
+        if let Some(index) = self
+            .pending_friend_requests
+            .iter()
+            .position(|(friend, _)| friend.node_id == node_id)
+        {
+            self.pending_friend_requests.remove(index);
+        }
+    }
+
+    //hmmm...
+    pub fn handle_friend_request(&mut self, node_id: NodeId, friend_type: FriendType) {
+        if self
+            .pending_friend_requests
+            .iter()
+            .any(|(friend, _)| friend.node_id == node_id)
+        {
+            // If we already have a pending request from this node, accept it
+            self.accept_friend_request(node_id, friend_type).unwrap();
+        } else {
+            // Otherwise, add it as a received request
+            self.add_pending_friend_request(node_id);
+        }
+    }
+
+    pub fn handle_friend_response(&mut self, node_id: NodeId) {
+        if let Some(index) = self
+            .pending_friend_requests
+            .iter()
+            .position(|(friend, is_local)| friend.node_id == node_id && *is_local)
+        {
+            let (friend, _) = self.pending_friend_requests.remove(index);
+            self.add_friend(node_id, friend.friend_type);
+        }
+    }
     pub fn remove_friend(&mut self, node_id: &NodeId) {
         self.friends.remove(node_id);
         for list in self.custom_lists.values_mut() {
@@ -199,6 +293,16 @@ impl DB {
         let query =
             "SELECT * FROM locations WHERE start_date <= ? AND (end_date >= ? OR end_date IS NULL)";
         let params = vec![end.into(), start.into()];
+        let results = self.inner.read(query.to_string(), params)?;
+        results
+            .into_iter()
+            .map(|row| self.row_to_location(&row))
+            .collect()
+    }
+
+    pub fn get_locations_by_owner(&self, owner: &NodeId) -> Result<Vec<Location>> {
+        let query = "SELECT * FROM locations WHERE owner = ?";
+        let params = vec![owner.to_string().into()];
         let results = self.inner.read(query.to_string(), params)?;
         results
             .into_iter()

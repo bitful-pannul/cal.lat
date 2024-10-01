@@ -1,4 +1,4 @@
-use crate::state::{Location, NewLocation, State};
+use crate::state::{Friend, FriendType, Location, NewLocation, State};
 use anyhow::{anyhow, Result};
 use kinode_process_lib::{get_blob, http, println, Address, LazyLoadBlob, Message};
 use serde_json::json;
@@ -41,6 +41,11 @@ pub fn handle_request(
                 ("PUT", p) if p.starts_with("/api/locations/") => {
                     handle_update_location(req, state)
                 }
+                ("GET", "/api/friends") => handle_get_friends(req, state),
+                ("POST", "/api/friends") => handle_add_friend(req, state, our),
+                ("GET", "/api/ping") => handle_ping(req, state, our),
+                ("GET", "/api/custom_lists") => handle_get_custom_lists(req, state),
+                ("POST", "/api/custom_lists") => handle_add_custom_list(req, state, our),
                 _ => Err(anyhow!("Not Found")),
             };
 
@@ -98,7 +103,87 @@ fn handle_add_location(
 
     println!("adding location: {:?}", location);
     state.add_location(location)?;
-    ok_response(&json!({"message": "Location added successfully"}))
+    ok_response(&json!({"message": "location added successfully"}))
+}
+
+fn handle_ping(
+    req: http::server::IncomingHttpRequest,
+    state: &mut State,
+    our: &Address,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
+    let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
+    let node_id = data["node_id"]
+        .as_str()
+        .ok_or_else(|| anyhow!("invalid node ID"))?
+        .parse()?;
+
+    state.ping_node(node_id);
+
+    ok_response(&json!({"message": "ping sent successfully"}))
+}
+
+fn handle_add_custom_list(
+    req: http::server::IncomingHttpRequest,
+    state: &mut State,
+    our: &Address,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
+    let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
+    let list_name = data["list_name"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Invalid list name"))?;
+    let node_id = data["node_id"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Invalid node ID"))?
+        .parse()?;
+
+    state.add_to_custom_list(list_name.to_string(), node_id);
+    ok_response(&json!({"message": "node {node_id} added to list {list_name} successfully"}))
+}
+
+fn handle_get_friends(
+    _req: http::server::IncomingHttpRequest,
+    state: &State,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    let friends: Vec<&Friend> = state.friends.values().collect();
+    ok_response(&friends)
+}
+
+fn handle_add_friend(
+    _req: http::server::IncomingHttpRequest,
+    state: &mut State,
+    _our: &Address,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
+    let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
+    // todo, maybe custom AddFriend type?
+    let node_id = data["node_id"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Invalid node ID"))?
+        .parse()?;
+
+    let friend_type = data["friend_type"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Invalid friend type"))?;
+
+    let friend_type = match friend_type {
+        "best" => FriendType::Best,
+        "close_friend" => FriendType::CloseFriend,
+        "acquaintance" => FriendType::Acquaintance,
+        _ => return Err(anyhow!("Invalid friend type")),
+    };
+
+    state.send_friend_request(node_id, friend_type);
+
+    ok_response(&json!({"message": "friend added successfully"}))
+}
+
+fn handle_get_custom_lists(
+    _req: http::server::IncomingHttpRequest,
+    state: &State,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    ok_response(&state.custom_lists)
 }
 
 fn handle_get_location(
@@ -108,7 +193,7 @@ fn handle_get_location(
     let uuid = get_uuid_from_path(&req)?;
     let location = state
         .get_location(&uuid)?
-        .ok_or_else(|| anyhow!("Location not found"))?;
+        .ok_or_else(|| anyhow!("location not found"))?;
     ok_response(&location)
 }
 
@@ -121,7 +206,7 @@ fn handle_update_location(
     let mut location: Location = serde_json::from_slice(body.bytes())?;
     location.uuid = uuid;
     state.update_location(location)?;
-    ok_response(&json!({"message": "Location updated successfully"}))
+    ok_response(&json!({"message": "location updated successfully"}))
 }
 
 fn get_uuid_from_path(req: &http::server::IncomingHttpRequest) -> Result<Uuid> {
@@ -129,8 +214,8 @@ fn get_uuid_from_path(req: &http::server::IncomingHttpRequest) -> Result<Uuid> {
     let id = path
         .split('/')
         .last()
-        .ok_or_else(|| anyhow!("Invalid path format"))?;
-    Uuid::parse_str(id).map_err(|e| anyhow!("Invalid UUID: {}", e))
+        .ok_or_else(|| anyhow!("invalid path format"))?;
+    Uuid::parse_str(id).map_err(|e| anyhow!("invalid UUID: {}", e))
 }
 
 fn ok_response<T: serde::Serialize>(

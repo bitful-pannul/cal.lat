@@ -6,6 +6,7 @@ import CalendarView from '../components/CalendarView';
 import MapView from '../components/MapView';
 import { format } from 'date-fns';
 import useStore from '../store';
+import FriendList from '../components/FriendList';
 
 // @ts-ignore
 const BASE_URL = import.meta.env.BASE_URL;
@@ -19,7 +20,7 @@ function Home(): JSX.Element {
     start_date: Math.floor(Date.now() / 1000),
     end_date: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60
   });
-  const [activeTab, setActiveTab] = useState<'map' | 'calendar'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'calendar' | 'friends'>('map');
 
   const { locations, selectedLocation, dateRange, setLocations, setSelectedLocation, setDateRange } = useStore();
 
@@ -91,6 +92,7 @@ function Home(): JSX.Element {
       <div className="tab-controls">
         <button onClick={() => setActiveTab('map')} className={activeTab === 'map' ? 'active' : ''}>Map</button>
         <button onClick={() => setActiveTab('calendar')} className={activeTab === 'calendar' ? 'active' : ''}>Calendar</button>
+        <button onClick={() => setActiveTab('friends')} className={activeTab === 'friends' ? 'active' : ''}>Friends</button>
       </div>
       <div className="slider-container">
         <DateSlider
@@ -115,6 +117,9 @@ function Home(): JSX.Element {
               locations={locations}
               onSelectLocation={setSelectedLocation}
             />
+          )}
+          {activeTab === 'friends' && (
+            <FriendList />
           )}
         </div>
         <div className="sidebar">
