@@ -85,7 +85,6 @@ function Home(): JSX.Element {
     return format(new Date(timestamp * 1000), 'do MMMM yyyy');
   };
 
-
   return (
     <div className="container">
       <h1 className="title">cal.lat</h1>
@@ -109,6 +108,7 @@ function Home(): JSX.Element {
                 locations={locations}
                 selectedLocation={selectedLocation}
                 onMapClick={handleMapClick}
+                newLocation={newLocation}
               />
             </div>
           )}
@@ -164,7 +164,7 @@ function Home(): JSX.Element {
               placeholder="Description"
               required
             />
-            <p>Coordinates: {newLocation.latitude?.toFixed(4) || 'N/A'}, {newLocation.longitude?.toFixed(4) || 'N/A'}</p>
+            <p>Coordinates: {newLocation.latitude !== null ? newLocation.latitude.toFixed(4) : 'Click anywhere on the map to set coordinates!'}, {newLocation.longitude !== null ? newLocation.longitude.toFixed(4) : ''}</p>
             <p>Click on the map to set coordinates</p>
             <DateSlider
               startDate={new Date(newLocation.start_date * 1000)}

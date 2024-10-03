@@ -58,11 +58,11 @@ impl GranularityProtocol {
     ) -> Vec<Location> {
         locations
             .into_iter()
-            .map(|location| self.fuzz_location(location, friend_type))
+            .map(|location| self.fuzz_location(&location, friend_type))
             .collect()
     }
 
-    pub fn fuzz_location(&self, location: Location, friend_type: &FriendType) -> Location {
+    pub fn fuzz_location(&self, location: &Location, friend_type: &FriendType) -> Location {
         let (fuzzed_longitude, fuzzed_latitude) = match friend_type {
             FriendType::Best => (location.longitude, location.latitude), // exact location
             FriendType::CloseFriend => {
@@ -87,7 +87,7 @@ impl GranularityProtocol {
         Location {
             longitude: fuzzed_longitude,
             latitude: fuzzed_latitude,
-            ..location
+            ..location.clone()
         }
     }
 }

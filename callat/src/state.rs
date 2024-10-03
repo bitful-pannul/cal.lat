@@ -65,7 +65,25 @@ impl State {
     }
 
     pub fn add_location(&mut self, location: Location) -> Result<()> {
-        self.db.insert_location(&location)
+        self.db.insert_location(&location)?;
+
+        for friend in self.friends.values() {
+            let fuzzed_location = self
+                .geo_protocol
+                .fuzz_location(&location, &friend.friend_type);
+            let req = RemoteRequest::Sync {
+                locations: vec![fuzzed_location],
+            };
+            let address = Address::new(
+                friend.node_id.clone(),
+                ProcessId::from_str(PROCESS_ID).unwrap(),
+            );
+            Request::to(address)
+                .body(serde_json::to_vec(&req)?)
+                .send()
+                .unwrap();
+        }
+        Ok(())
     }
 
     pub fn update_location(&mut self, location: Location) -> Result<()> {
@@ -105,11 +123,18 @@ impl State {
         self.friends.insert(
             node_id.clone(),
             Friend {
-                node_id,
+                node_id: node_id.clone(),
                 friend_type,
                 last_pinged: Utc::now().timestamp(),
             },
         );
+        Request::to(Address::new(
+            node_id,
+            ProcessId::from_str(PROCESS_ID).unwrap(),
+        ))
+        .body(serde_json::to_vec(&RemoteRequest::FriendResponse).unwrap())
+        .send()
+        .unwrap();
     }
 
     pub fn send_friend_request(&mut self, node_id: NodeId, friend_type: FriendType) {
@@ -121,6 +146,7 @@ impl State {
             },
             true, // is_local
         ));
+        println!("sending friend request to {}", node_id);
         Request::to(Address::new(
             node_id,
             ProcessId::from_str(PROCESS_ID).unwrap(),

@@ -10,10 +10,21 @@ pub fn serve(our: &Address) -> http::server::HttpServer {
     server
         .serve_ui(our, "ui", vec!["/"], config.clone())
         .expect("failed to serve ui");
-
     server
         .bind_http_path("/api/locations", config.clone())
         .expect("failed to bind /api/locations");
+    server
+        .bind_http_path("/api/friends/pending", config.clone())
+        .expect("failed to bind /api/friends/pending");
+    server
+        .bind_http_path("/api/friends", config.clone())
+        .expect("failed to bind /api/friends");
+    server
+        .bind_http_path("/api/friends/accept", config.clone())
+        .expect("failed to bind /api/friends/accept");
+    server
+        .bind_http_path("/api/friends/reject", config.clone())
+        .expect("failed to bind /api/friends/reject");
     server
         .bind_http_path("/api/locations/:id", config)
         .expect("failed to bind /api/locations/:id");
@@ -34,6 +45,7 @@ pub fn handle_request(
             let method = req.method().unwrap_or_default();
             let path = req.path().unwrap_or_default();
 
+            println!("method: {:?}, path: {:?}", method, path);
             let result = match (method.as_str(), path.as_str()) {
                 ("GET", "/api/locations") => handle_get_locations(req, state),
                 ("POST", "/api/locations") => handle_add_location(req, state, our),
@@ -43,6 +55,10 @@ pub fn handle_request(
                 }
                 ("GET", "/api/friends") => handle_get_friends(req, state),
                 ("POST", "/api/friends") => handle_add_friend(req, state, our),
+                ("GET", "/api/friends/pending") => handle_get_pending_friends(req, state),
+                ("POST", "/api/friends/accept") => handle_accept_friend(req, state, our),
+                ("POST", "/api/friends/reject") => handle_reject_friend(req, state),
+
                 ("GET", "/api/ping") => handle_ping(req, state, our),
                 ("GET", "/api/custom_lists") => handle_get_custom_lists(req, state),
                 ("POST", "/api/custom_lists") => handle_add_custom_list(req, state, our),
@@ -147,7 +163,30 @@ fn handle_get_friends(
     state: &State,
 ) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
     let friends: Vec<&Friend> = state.friends.values().collect();
+    println!("friends: {:?}", friends);
     ok_response(&friends)
+}
+
+fn handle_get_pending_friends(
+    _req: http::server::IncomingHttpRequest,
+    state: &State,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    let incoming = state
+        .pending_friend_requests
+        .iter()
+        .filter(|(_, is_local)| !is_local)
+        .map(|(friend, _)| friend)
+        .collect::<Vec<_>>();
+    let outgoing = state
+        .pending_friend_requests
+        .iter()
+        .filter(|(_, is_local)| *is_local)
+        .map(|(friend, _)| friend)
+        .collect::<Vec<_>>();
+    ok_response(&json!({
+        "incoming": incoming,
+        "outgoing": outgoing
+    }))
 }
 
 fn handle_add_friend(
@@ -168,15 +207,68 @@ fn handle_add_friend(
         .ok_or_else(|| anyhow!("Invalid friend type"))?;
 
     let friend_type = match friend_type {
-        "best" => FriendType::Best,
-        "close_friend" => FriendType::CloseFriend,
-        "acquaintance" => FriendType::Acquaintance,
+        "Best" => FriendType::Best,
+        "CloseFriend" => FriendType::CloseFriend,
+        "Acquaintance" => FriendType::Acquaintance,
         _ => return Err(anyhow!("Invalid friend type")),
     };
 
     state.send_friend_request(node_id, friend_type);
 
     ok_response(&json!({"message": "friend added successfully"}))
+}
+
+fn handle_accept_friend(
+    _req: http::server::IncomingHttpRequest,
+    state: &mut State,
+    our: &Address,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
+    let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
+    let node_id = data["node_id"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Invalid node ID"))?
+        .parse()?;
+
+    let friend_type = match data["friend_type"].as_str() {
+        Some("Best") => FriendType::Best,
+        Some("CloseFriend") => FriendType::CloseFriend,
+        Some("Acquaintance") => FriendType::Acquaintance,
+        _ => return Err(anyhow!("Invalid friend type")),
+    };
+
+    state.accept_friend_request(node_id, friend_type)?;
+    ok_response(&json!({"message": "friend request accepted successfully"}))
+}
+
+fn handle_reject_friend(
+    _req: http::server::IncomingHttpRequest,
+    state: &mut State,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
+    let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
+    let node_id = data["node_id"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Invalid node ID"))?
+        .parse()?;
+
+    state.reject_friend_request(node_id);
+    ok_response(&json!({"message": "friend request rejected successfully"}))
+}
+
+fn handle_remove_friend(
+    _req: http::server::IncomingHttpRequest,
+    state: &mut State,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
+    let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
+    let node_id = data["node_id"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Invalid node ID"))?
+        .parse()?;
+
+    state.remove_friend(&node_id);
+    ok_response(&json!({"message": "friend removed successfully"}))
 }
 
 fn handle_get_custom_lists(

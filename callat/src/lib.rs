@@ -20,7 +20,7 @@ wit_bindgen::generate!({
 const TIMEOUT: u64 = 30;
 
 // Local requests like adding a friend, updating a location, etc.
-// are handled by http methods in frontend.rs.
+// are handled by http methods in frontend.rs
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RemoteRequest {
@@ -63,6 +63,7 @@ fn handle_message(
     server: &mut http::server::HttpServer,
 ) -> Result<()> {
     match await_message() {
+        //
         Ok(message) => {
             if message.is_local(our) {
                 if message.is_process("timer:distro:sys") {

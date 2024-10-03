@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
 import OSM from 'ol/source/OSM';
@@ -17,31 +17,48 @@ interface MapViewProps {
     locations: Location[];
     selectedLocation: Location | null;
     onMapClick: (event: MapBrowserEvent<UIEvent>) => void;
+    newLocation: { latitude: number | null; longitude: number | null };
 }
 
-const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapClick }) => {
+const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapClick, newLocation }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<Map | null>(null);
+    const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const [tempFeature, setTempFeature] = useState<Feature | null>(null);
 
     useEffect(() => {
-        if (!mapRef.current) return;
+        if (!mapRef.current || mapInstance.current) return;
 
-        if (!mapInstance.current) {
-            const initialMap = new Map({
-                target: mapRef.current,
-                layers: [new TileLayer({ source: new OSM() })],
-                view: new View({ center: [0, 0], zoom: 2 }),
-            });
-
-            mapInstance.current = initialMap;
-            initialMap.on('click', onMapClick);
-        }
+        const initialMap = new Map({
+            target: mapRef.current,
+            layers: [new TileLayer({ source: new OSM() })],
+            view: new View({ center: [0, 0], zoom: 2 }),
+        });
 
         const vectorSource = new VectorSource();
         const vectorLayer = new VectorLayer({ source: vectorSource });
 
-        const locationsToShow = selectedLocation ? [selectedLocation] : locations;
+        initialMap.addLayer(vectorLayer);
+        initialMap.on('click', onMapClick);
 
+        mapInstance.current = initialMap;
+        vectorLayerRef.current = vectorLayer;
+
+        return () => {
+            initialMap.setTarget(undefined);
+            mapInstance.current = null;
+        };
+    }, [onMapClick]);
+
+    useEffect(() => {
+        if (!mapInstance.current || !vectorLayerRef.current) return;
+
+        const vectorSource = vectorLayerRef.current.getSource();
+        if (!vectorSource) return;
+
+        vectorSource.clear();
+
+        const locationsToShow = selectedLocation ? [selectedLocation] : locations;
         locationsToShow.forEach(location => {
             const feature = new Feature({
                 geometry: new Point(fromLonLat([location.longitude, location.latitude])),
@@ -68,7 +85,25 @@ const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapCli
             vectorSource.addFeature(feature);
         });
 
-        mapInstance.current.addLayer(vectorLayer);
+        if (newLocation.latitude !== null && newLocation.longitude !== null) {
+            const newTempFeature = new Feature({
+                geometry: new Point(fromLonLat([newLocation.longitude, newLocation.latitude])),
+            });
+
+            newTempFeature.setStyle(new Style({
+                image: new Circle({
+                    radius: 6,
+                    fill: new Fill({ color: '#f39c12' }),
+                    stroke: new Stroke({ color: '#fff', width: 2 })
+                })
+            }));
+
+            vectorSource.addFeature(newTempFeature);
+            setTempFeature(newTempFeature);
+        } else if (tempFeature) {
+            vectorSource.removeFeature(tempFeature);
+            setTempFeature(null);
+        }
 
         if (selectedLocation) {
             mapInstance.current.getView().animate({
@@ -77,19 +112,13 @@ const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapCli
                 duration: 1000
             });
         }
-
-        return () => {
-            if (mapInstance.current) {
-                mapInstance.current.removeLayer(vectorLayer);
-            }
-        };
-    }, [locations, selectedLocation, onMapClick]);
+    }, [locations, selectedLocation, newLocation, tempFeature]);
 
     useEffect(() => {
         if (mapInstance.current) {
             mapInstance.current.updateSize();
         }
-    }, []);
+    });
 
     return <div className="map-container" ref={mapRef}></div>;
 };
