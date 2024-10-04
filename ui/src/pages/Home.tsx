@@ -7,6 +7,7 @@ import MapView from '../components/MapView';
 import { format } from 'date-fns';
 import useStore from '../store';
 import FriendList from '../components/FriendList';
+import Sidebar from '../components/Sidebar';
 
 // @ts-ignore
 const BASE_URL = import.meta.env.BASE_URL;
@@ -124,36 +125,17 @@ function Home(): JSX.Element {
             <FriendList />
           )}
         </div>
-        <div className="sidebar">
-          <h2>Locations</h2>
-          {selectedLocation ? (
-            <div className="location-details">
-              <button className="back-button" onClick={() => setSelectedLocation(null)}>Back to Locations</button>
-              <h3>{selectedLocation.owner}: {selectedLocation.description}</h3>
-              <p>Coordinates: ({selectedLocation.latitude.toFixed(4)}, {selectedLocation.longitude.toFixed(4)})</p>
-              <p>Date: {formatDate(selectedLocation.start_date)} - {formatDate(selectedLocation.end_date)}</p>
-            </div>
-          ) : (
-            <>
-              <ul className="locations-list">
-                {locations.map((location) => (
-                  <li
-                    key={location.id}
-                    className="location-item"
-                    onClick={() => setSelectedLocation(location)}
-                  >
-                    <strong>{location.description}</strong>
-                    <br />
-                    <em>{location.owner}</em>
-                    <br />
-                    {formatDate(location.start_date)} - {formatDate(location.end_date)}
-                  </li>
-                ))}
-              </ul>
-              <button className="add-location-btn" onClick={() => setShowNewLocationPopup(true)}>Add New Location</button>
-            </>
-          )}
-        </div>
+        <Sidebar
+          locations={locations}
+          selectedLocation={selectedLocation}
+          setSelectedLocation={setSelectedLocation}
+          showNewLocationPopup={showNewLocationPopup}
+          setShowNewLocationPopup={setShowNewLocationPopup}
+          newLocation={newLocation}
+          setNewLocation={setNewLocation}
+          handleNewLocationSubmit={handleNewLocationSubmit}
+          formatDate={formatDate}
+        />
       </div>
       {showNewLocationPopup && (
         <div className="popup">
