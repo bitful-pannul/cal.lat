@@ -116,6 +116,8 @@ function Home(): JSX.Element {
             <CalendarView
               locations={locations}
               onSelectLocation={setSelectedLocation}
+              startDate={dateRange.start}
+              endDate={dateRange.end}
             />
           )}
           {activeTab === 'friends' && (

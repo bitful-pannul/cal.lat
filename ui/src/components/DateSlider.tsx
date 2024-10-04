@@ -12,6 +12,7 @@ const DateSlider: React.FC<DateSliderProps> = ({ startDate, endDate, onChange })
     const [start, setStart] = useState<number>(startDate.getTime());
     const [end, setEnd] = useState<number>(endDate.getTime());
     const sliderRef = useRef<HTMLDivElement>(null);
+    const isInitialMount = useRef(true);
 
     const minDate = new Date(2024, 0, 1).getTime();
     const maxDate = new Date(2027, 11, 31).getTime();
@@ -22,6 +23,15 @@ const DateSlider: React.FC<DateSliderProps> = ({ startDate, endDate, onChange })
     }, [startDate, endDate]);
 
     const debouncedOnChange = useCallback(debounce(onChange, 200), [onChange]);
+
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            onChange(new Date(start), new Date(end));
+        } else {
+            debouncedOnChange(new Date(start), new Date(end));
+        }
+    }, [start, end, onChange, debouncedOnChange]);
 
     const handleMouseDown = (e: React.MouseEvent, isStart: boolean) => {
         e.preventDefault();
@@ -36,11 +46,9 @@ const DateSlider: React.FC<DateSliderProps> = ({ startDate, endDate, onChange })
             if (isStart) {
                 const newStart = Math.min(newValue, end - 86400000);
                 setStart(newStart);
-                debouncedOnChange(new Date(newStart), new Date(end));
             } else {
                 const newEnd = Math.max(newValue, start + 86400000);
                 setEnd(newEnd);
-                debouncedOnChange(new Date(start), new Date(newEnd));
             }
         };
 
@@ -70,7 +78,6 @@ const DateSlider: React.FC<DateSliderProps> = ({ startDate, endDate, onChange })
                     onChange={(e) => {
                         const newStart = new Date(e.target.value).getTime();
                         setStart(newStart);
-                        debouncedOnChange(new Date(newStart), new Date(end));
                     }}
                     min={formatDate(minDate)}
                     max={formatDate(maxDate)}
@@ -81,7 +88,6 @@ const DateSlider: React.FC<DateSliderProps> = ({ startDate, endDate, onChange })
                     onChange={(e) => {
                         const newEnd = new Date(e.target.value).getTime();
                         setEnd(newEnd);
-                        debouncedOnChange(new Date(start), new Date(newEnd));
                     }}
                     min={formatDate(minDate)}
                     max={formatDate(maxDate)}
