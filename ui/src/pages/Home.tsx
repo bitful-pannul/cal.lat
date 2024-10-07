@@ -21,6 +21,7 @@ function Home(): JSX.Element {
     start_date: Math.floor(Date.now() / 1000),
     end_date: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60
   });
+
   const [activeTab, setActiveTab] = useState<'map' | 'calendar' | 'friends'>('map');
 
   const { locations, selectedLocation, dateRange, setLocations, setSelectedLocation, setDateRange } = useStore();
@@ -40,7 +41,11 @@ function Home(): JSX.Element {
     const [longitude, latitude] = toLonLat(clickedCoord);
 
     if (showNewLocationPopup) {
-      setNewLocation(prev => ({ ...prev, latitude, longitude }));
+      setNewLocation(prev => ({
+        ...prev,
+        latitude,
+        longitude,
+      }));
     } else {
       const feature = event.map.forEachFeatureAtPixel(event.pixel, (feature) => feature);
       if (feature) {
@@ -55,6 +60,14 @@ function Home(): JSX.Element {
     setDateRange({ start, end });
     fetchLocations(start, end);
   }, [setDateRange, fetchLocations]);
+
+  const handleNewLocationDateChange = useCallback((start: Date, end: Date) => {
+    setNewLocation(prev => ({
+      ...prev,
+      start_date: Math.floor(start.getTime() / 1000),
+      end_date: Math.floor(end.getTime() / 1000)
+    }));
+  }, []);
 
   const handleNewLocationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,13 +166,7 @@ function Home(): JSX.Element {
             <DateSlider
               startDate={new Date(newLocation.start_date * 1000)}
               endDate={new Date(newLocation.end_date * 1000)}
-              onChange={(start, end) => {
-                setNewLocation(prev => ({
-                  ...prev,
-                  start_date: Math.floor(start.getTime() / 1000),
-                  end_date: Math.floor(end.getTime() / 1000)
-                }));
-              }}
+              onChange={handleNewLocationDateChange}
             />
             <button type="submit">Add Location</button>
             <button type="button" onClick={() => setShowNewLocationPopup(false)}>Cancel</button>

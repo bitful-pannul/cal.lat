@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
 import OSM from 'ol/source/OSM';
@@ -24,7 +24,6 @@ const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapCli
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<Map | null>(null);
     const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-    const [tempFeature, setTempFeature] = useState<Feature | null>(null);
 
     useEffect(() => {
         if (!mapRef.current || mapInstance.current) return;
@@ -58,20 +57,19 @@ const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapCli
 
         vectorSource.clear();
 
-        const locationsToShow = selectedLocation ? [selectedLocation] : locations;
-        locationsToShow.forEach(location => {
+        // Add features for locations
+        locations.forEach(location => {
             const feature = new Feature({
                 geometry: new Point(fromLonLat([location.longitude, location.latitude])),
                 name: `${location.description} (${location.owner})`,
                 location: location,
             });
 
-            const isSelected = selectedLocation && selectedLocation.id === location.id;
-
+            // Set style for the feature
             feature.setStyle(new Style({
                 image: new Circle({
-                    radius: isSelected ? 8 : 6,
-                    fill: new Fill({ color: isSelected ? '#e74c3c' : '#3498db' }),
+                    radius: selectedLocation && selectedLocation.id === location.id ? 8 : 6,
+                    fill: new Fill({ color: selectedLocation && selectedLocation.id === location.id ? '#e74c3c' : '#3498db' }),
                     stroke: new Stroke({ color: '#fff', width: 2 })
                 }),
                 text: new Text({
@@ -85,12 +83,13 @@ const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapCli
             vectorSource.addFeature(feature);
         });
 
+        // Add feature for new location if coordinates are set
         if (newLocation.latitude !== null && newLocation.longitude !== null) {
-            const newTempFeature = new Feature({
+            const newLocationFeature = new Feature({
                 geometry: new Point(fromLonLat([newLocation.longitude, newLocation.latitude])),
             });
 
-            newTempFeature.setStyle(new Style({
+            newLocationFeature.setStyle(new Style({
                 image: new Circle({
                     radius: 6,
                     fill: new Fill({ color: '#f39c12' }),
@@ -98,13 +97,10 @@ const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapCli
                 })
             }));
 
-            vectorSource.addFeature(newTempFeature);
-            setTempFeature(newTempFeature);
-        } else if (tempFeature) {
-            vectorSource.removeFeature(tempFeature);
-            setTempFeature(null);
+            vectorSource.addFeature(newLocationFeature);
         }
 
+        // Animate to selected location if exists
         if (selectedLocation) {
             mapInstance.current.getView().animate({
                 center: fromLonLat([selectedLocation.longitude, selectedLocation.latitude]),
@@ -112,13 +108,7 @@ const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapCli
                 duration: 1000
             });
         }
-    }, [locations, selectedLocation, newLocation, tempFeature]);
-
-    useEffect(() => {
-        if (mapInstance.current) {
-            mapInstance.current.updateSize();
-        }
-    });
+    }, [locations, selectedLocation, newLocation]);
 
     return <div className="map-container" ref={mapRef}></div>;
 };

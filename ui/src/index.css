@@ -161,7 +161,6 @@
 }
 
 /* Buttons */
-.back-button,
 .add-location-btn {
   display: block;
   width: 100%;
@@ -175,6 +174,29 @@
   text-align: center;
   transition: background-color 0.3s;
 }
+
+.back-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30%;
+  margin-bottom: 20px;
+  padding: 10px 15px;
+  background-color: var(--orange);
+  color: var(--white);
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.back-button::before {
+  content: "\2190";
+  /* Unicode for left arrow */
+  margin-right: 5px;
+  font-size: 1.2em;
+}
+
 
 .back-button:hover,
 .add-location-btn:hover {
@@ -384,4 +406,30 @@
   .sidebar {
     width: 100%;
   }
+}
+
+.date-bubble {
+  position: absolute;
+  top: -40px;
+  transform: translateX(-50%);
+  background-color: var(--dark-orange);
+  color: var(--white);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.date-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -8px;
+  border-width: 8px;
+  border-style: solid;
+  border-color: var(--dark-orange) transparent transparent transparent;
 }

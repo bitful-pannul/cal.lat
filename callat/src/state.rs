@@ -216,6 +216,19 @@ impl State {
         }
     }
 
+    pub fn ping_friend(&mut self, node_id: NodeId) {
+        if let Some(friend) = self.friends.get_mut(&node_id) {
+            Request::to(Address::new(
+                node_id,
+                ProcessId::from_str(PROCESS_ID).unwrap(),
+            ))
+            .body(serde_json::to_vec(&RemoteRequest::Ping).unwrap())
+            .send()
+            .unwrap();
+            friend.last_pinged = Utc::now().timestamp();
+        }
+    }
+
     pub fn handle_friend_response(&mut self, node_id: NodeId) {
         if let Some(index) = self
             .pending_friend_requests

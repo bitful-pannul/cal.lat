@@ -20,11 +20,17 @@ pub fn serve(our: &Address) -> http::server::HttpServer {
         .bind_http_path("/api/friends", config.clone())
         .expect("failed to bind /api/friends");
     server
+        .bind_http_path("/api/friends/sync", config.clone())
+        .expect("failed to bind /api/friends/ping");
+    server
         .bind_http_path("/api/friends/accept", config.clone())
         .expect("failed to bind /api/friends/accept");
     server
         .bind_http_path("/api/friends/reject", config.clone())
         .expect("failed to bind /api/friends/reject");
+    server
+        .bind_http_path("/api/friends/cancel", config.clone())
+        .expect("failed to bind /api/friends/cancel");
     server
         .bind_http_path("/api/locations/:id", config)
         .expect("failed to bind /api/locations/:id");
@@ -53,15 +59,18 @@ pub fn handle_request(
                 ("PUT", p) if p.starts_with("/api/locations/") => {
                     handle_update_location(req, state)
                 }
-                ("GET", "/api/friends") => handle_get_friends(req, state),
-                ("POST", "/api/friends") => handle_add_friend(req, state, our),
-                ("GET", "/api/friends/pending") => handle_get_pending_friends(req, state),
-                ("POST", "/api/friends/accept") => handle_accept_friend(req, state, our),
-                ("POST", "/api/friends/reject") => handle_reject_friend(req, state),
+                ("GET", "/api/friends") => handle_get_friends(state),
+                ("POST", "/api/friends") => handle_add_friend(state),
+                ("GET", "/api/friends/pending") => handle_get_pending_friends(state),
+                ("POST", "/api/friends/accept") => handle_accept_friend(state),
+                ("POST", "/api/friends/reject") => handle_reject_friend(state),
+                ("POST", "/api/friends/remove") => handle_remove_friend(state),
+                ("POST", "/api/friends/cancel") => handle_cancel_friend(state),
+                ("POST", "/api/friends/ping") => handle_ping_friend(state),
 
-                ("GET", "/api/ping") => handle_ping(req, state, our),
-                ("GET", "/api/custom_lists") => handle_get_custom_lists(req, state),
-                ("POST", "/api/custom_lists") => handle_add_custom_list(req, state, our),
+                ("GET", "/api/ping") => handle_ping(state),
+                ("GET", "/api/custom_lists") => handle_get_custom_lists(state),
+                ("POST", "/api/custom_lists") => handle_add_custom_list(state),
                 _ => Err(anyhow!("Not Found")),
             };
 
@@ -122,11 +131,7 @@ fn handle_add_location(
     ok_response(&json!({"message": "location added successfully"}))
 }
 
-fn handle_ping(
-    req: http::server::IncomingHttpRequest,
-    state: &mut State,
-    our: &Address,
-) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+fn handle_ping(state: &mut State) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
     let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
     let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
     let node_id = data["node_id"]
@@ -140,9 +145,7 @@ fn handle_ping(
 }
 
 fn handle_add_custom_list(
-    req: http::server::IncomingHttpRequest,
     state: &mut State,
-    our: &Address,
 ) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
     let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
     let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
@@ -158,17 +161,13 @@ fn handle_add_custom_list(
     ok_response(&json!({"message": "node {node_id} added to list {list_name} successfully"}))
 }
 
-fn handle_get_friends(
-    _req: http::server::IncomingHttpRequest,
-    state: &State,
-) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+fn handle_get_friends(state: &State) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
     let friends: Vec<&Friend> = state.friends.values().collect();
     println!("friends: {:?}", friends);
     ok_response(&friends)
 }
 
 fn handle_get_pending_friends(
-    _req: http::server::IncomingHttpRequest,
     state: &State,
 ) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
     let incoming = state
@@ -189,10 +188,24 @@ fn handle_get_pending_friends(
     }))
 }
 
-fn handle_add_friend(
-    _req: http::server::IncomingHttpRequest,
+fn handle_cancel_friend(
     state: &mut State,
-    _our: &Address,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
+    let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
+    let node_id = data["node_id"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Invalid node ID"))?;
+
+    state
+        .pending_friend_requests
+        .retain(|(friend, _)| friend.node_id != node_id);
+
+    ok_response(&json!({"message": "friend request canceled successfully"}))
+}
+
+fn handle_add_friend(
+    state: &mut State,
 ) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
     let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
     let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
@@ -219,9 +232,7 @@ fn handle_add_friend(
 }
 
 fn handle_accept_friend(
-    _req: http::server::IncomingHttpRequest,
     state: &mut State,
-    our: &Address,
 ) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
     let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
     let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
@@ -241,8 +252,21 @@ fn handle_accept_friend(
     ok_response(&json!({"message": "friend request accepted successfully"}))
 }
 
+fn handle_ping_friend(
+    state: &mut State,
+) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
+    let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
+    let data: serde_json::Value = serde_json::from_slice(body.bytes())?;
+    let node_id = data["node_id"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Invalid node ID"))?
+        .parse()?;
+
+    state.ping_friend(node_id);
+    ok_response(&json!({"message": "friend pinged successfully"}))
+}
+
 fn handle_reject_friend(
-    _req: http::server::IncomingHttpRequest,
     state: &mut State,
 ) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
     let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
@@ -257,7 +281,6 @@ fn handle_reject_friend(
 }
 
 fn handle_remove_friend(
-    _req: http::server::IncomingHttpRequest,
     state: &mut State,
 ) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
     let body = get_blob().ok_or_else(|| anyhow!("no blob in request"))?;
@@ -272,7 +295,6 @@ fn handle_remove_friend(
 }
 
 fn handle_get_custom_lists(
-    _req: http::server::IncomingHttpRequest,
     state: &State,
 ) -> Result<(http::server::HttpResponse, Option<LazyLoadBlob>)> {
     ok_response(&state.custom_lists)

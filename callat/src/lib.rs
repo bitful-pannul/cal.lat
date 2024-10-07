@@ -116,7 +116,7 @@ fn handle_remote_message(our: &Address, message: Message, state: &mut State) -> 
                     locations: fuzzed_locations,
                 };
 
-                let address = Address::new(sender, ProcessId::from_str(our.process()).unwrap());
+                let address = Address::new(sender, our.process.clone());
 
                 Request::to(address)
                     .body(serde_json::to_vec(&req)?)

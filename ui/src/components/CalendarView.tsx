@@ -43,8 +43,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ locations, onSelectLocation
             endAccessor="end"
             style={{ height: 500 }}
             onSelectEvent={(event) => onSelectLocation(event.resource)}
-            date={startDate}
-            onNavigate={() => { }}
         />
     );
 

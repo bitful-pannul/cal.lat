@@ -26,7 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <button className="add-location-btn" onClick={() => setShowNewLocationPopup(true)}>Add New Location</button>
             {selectedLocation ? (
                 <div className="location-details">
-                    <button className="back-button" onClick={() => setSelectedLocation(null)}>Back to Locations</button>
+                    <button className="back-button" onClick={() => setSelectedLocation(null)}>Back</button>
                     <h3>{selectedLocation.owner}: {selectedLocation.description}</h3>
                     <p>Coordinates: ({selectedLocation.latitude.toFixed(4)}, {selectedLocation.longitude.toFixed(4)})</p>
                     <p>Date: {formatDate(selectedLocation.start_date)} - {formatDate(selectedLocation.end_date)}</p>
