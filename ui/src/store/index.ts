@@ -30,6 +30,16 @@ export interface PendingRequest {
     is_local: boolean;
 }
 
+export interface NewLocationData {
+    description: string;
+    latitude: number | null;
+    longitude: number | null;
+    start_date: number;
+    end_date: number;
+    photos: string[];
+}
+
+
 interface AppState {
     locations: Location[];
     selectedLocation: Location | null;

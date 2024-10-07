@@ -23,16 +23,27 @@ const FriendList: React.FC = () => {
 
     const formatLastPinged = (timestamp: number) => {
         const now = Date.now();
-        const diff = now - timestamp;
+        const timestampMs = timestamp * 1000; // Convert Unix timestamp to milliseconds
+        const diff = now - timestampMs;
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
-        if (hours > 0) {
+        if (hours > 24) {
+            const days = Math.floor(hours / 24);
+            return `${days} day${days > 1 ? 's' : ''} ago`;
+        } else if (hours > 0) {
             return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-        } else {
+        } else if (minutes > 0) {
             return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+        } else {
+            return 'Just now';
         }
     };
+
+    const getFriendTypeForRequest = (nodeId: string): 'Best' | 'CloseFriend' | 'Acquaintance' => {
+        return acceptFriendType[nodeId] || 'CloseFriend';
+    };
+
 
     return (
         <div className="friend-list">
@@ -78,7 +89,7 @@ const FriendList: React.FC = () => {
                         {!request.is_local ? (
                             <>
                                 <select
-                                    value={acceptFriendType[request.node_id]}
+                                    value={getFriendTypeForRequest(request.node_id)}
                                     onChange={(e) => setAcceptFriendType({
                                         ...acceptFriendType,
                                         [request.node_id]: e.target.value as 'Best' | 'CloseFriend' | 'Acquaintance'
@@ -88,7 +99,7 @@ const FriendList: React.FC = () => {
                                     <option value="CloseFriend">Close Friend</option>
                                     <option value="Acquaintance">Acquaintance</option>
                                 </select>
-                                <button onClick={() => acceptFriendRequest(request.node_id, acceptFriendType[request.node_id])}>Accept</button>
+                                <button onClick={() => acceptFriendRequest(request.node_id, getFriendTypeForRequest(request.node_id))}>Accept</button>
                                 <button onClick={() => rejectFriendRequest(request.node_id)}>Reject</button>
                             </>
                         ) : (

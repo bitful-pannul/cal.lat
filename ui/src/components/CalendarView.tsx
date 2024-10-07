@@ -4,6 +4,7 @@ import moment from 'moment';
 import { Location } from '../store';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
+
 moment.locale('en-GB');
 const localizer = momentLocalizer(moment);
 
@@ -25,6 +26,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ locations, onSelectLocation
         start: new Date(location.start_date * 1000),
         end: new Date(location.end_date * 1000),
         resource: location,
+        tooltip: `Owner: ${location.owner}\nDescription: ${location.description}`
     }));
 
     const renderMonthView = () => (
@@ -35,6 +37,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ locations, onSelectLocation
             endAccessor="end"
             style={{ height: 500 }}
             onSelectEvent={(event) => onSelectLocation(event.resource)}
+            components={{
+                event: (props) => (
+                    <div title={props.event.tooltip}>
+                        {props.title}
+                    </div>
+                )
+            }}
         />
     );
 
@@ -42,8 +51,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ locations, onSelectLocation
         const minDate = startDate.getTime() / 1000;
         const maxDate = endDate.getTime() / 1000;
         const totalSeconds = maxDate - minDate;
-        const containerWidth = waterfallRef.current ? waterfallRef.current.clientWidth : 1000;
-        const pixelsPerSecond = containerWidth / totalSeconds;
 
         return (
             <div className="waterfall-container">
@@ -55,8 +62,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ locations, onSelectLocation
                         className="waterfall-view"
                         ref={waterfallRef}
                         style={{
-                            height: `${locations.length * 30}px`,
-                            width: `${totalSeconds * pixelsPerSecond}px`,
+                            height: `${Math.min(locations.length * 30, 500)}px`,
+                            width: '100%',
                         }}
                     >
                         {locations.map((location, index) => (
@@ -65,10 +72,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ locations, onSelectLocation
                                 className="waterfall-item"
                                 style={{
                                     top: `${index * 30}px`,
-                                    left: `${Math.max(0, (location.start_date - minDate) * pixelsPerSecond)}px`,
-                                    width: `${Math.min((location.end_date - location.start_date) * pixelsPerSecond, (maxDate - location.start_date) * pixelsPerSecond)}px`,
+                                    left: `${((location.start_date - minDate) / totalSeconds) * 100}%`,
+                                    width: `${((location.end_date - location.start_date) / totalSeconds) * 100}%`,
                                 }}
                                 onClick={() => onSelectLocation(location)}
+                                title={`Owner: ${location.owner}\nDescription: ${location.description}`}
                             >
                                 <span className="waterfall-item-content">
                                     {location.owner}: {location.description}

@@ -126,7 +126,8 @@ fn handle_add_location(
     };
 
     println!("adding location: {:?}", location);
-    state.add_location(location)?;
+    state.add_location(&location)?;
+    state.share_location(&location)?;
     ok_response(&json!({"message": "location added successfully"}))
 }
 
@@ -199,6 +200,7 @@ fn handle_cancel_friend(
     state
         .pending_friend_requests
         .retain(|(friend, _)| friend.node_id != node_id);
+    let _ = state.save();
 
     ok_response(&json!({"message": "friend request canceled successfully"}))
 }

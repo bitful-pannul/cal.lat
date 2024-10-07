@@ -102,6 +102,21 @@ function Home(): JSX.Element {
     return format(new Date(timestamp * 1000), 'do MMMM yyyy');
   };
 
+  const handleNewLocationPopup = useCallback((show: boolean) => {
+    setShowNewLocationPopup(show);
+    if (!show) {
+      // Reset newLocation when closing the popup
+      setNewLocation({
+        description: '',
+        latitude: null,
+        longitude: null,
+        start_date: Math.floor(Date.now() / 1000),
+        end_date: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
+        photos: []
+      });
+    }
+  }, []);
+
   return (
     <div className="container">
       <h1 className="title">cal.lat</h1>
@@ -146,19 +161,24 @@ function Home(): JSX.Element {
           selectedLocation={selectedLocation}
           setSelectedLocation={setSelectedLocation}
           showNewLocationPopup={showNewLocationPopup}
-          setShowNewLocationPopup={setShowNewLocationPopup}
+          setShowNewLocationPopup={handleNewLocationPopup}
           formatDate={formatDate}
+          newLocation={newLocation}
+          setNewLocation={setNewLocation}
+          handleNewLocationSubmit={handleNewLocationSubmit}
+          handleNewLocationDateChange={handleNewLocationDateChange}
+          onMapClick={handleMapClick}
         />
-        {showNewLocationPopup && (
+        {/* {showNewLocationPopup && (
           <NewLocation
             onSubmit={handleNewLocationSubmit}
-            onCancel={() => setShowNewLocationPopup(false)}
+            onCancel={() => handleNewLocationPopup(false)}
             onMapClick={handleMapClick}
             newLocation={newLocation}
             setNewLocation={setNewLocation}
             handleNewLocationDateChange={handleNewLocationDateChange}
           />
-        )}
+        )} */}
       </div>
     </div>
   );

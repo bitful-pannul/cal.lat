@@ -1,15 +1,7 @@
 import React from 'react';
 import { MapBrowserEvent } from 'ol';
 import DateSlider from './DateSlider';
-
-interface NewLocationData {
-    description: string;
-    latitude: number | null;
-    longitude: number | null;
-    start_date: number;
-    end_date: number;
-    photos: string[];
-}
+import { NewLocationData } from '../store';
 
 interface NewLocationProps {
     onSubmit: (e: React.FormEvent) => void;
@@ -46,7 +38,7 @@ const NewLocation: React.FC<NewLocationProps> = ({
     };
 
     return (
-        <div className="popup">
+        <div className="new-location-form">
             <h3>Add New Location</h3>
             <form onSubmit={onSubmit}>
                 <input

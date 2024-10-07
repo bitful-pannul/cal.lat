@@ -55,21 +55,31 @@ const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapCli
         const vectorSource = vectorLayerRef.current.getSource();
         if (!vectorSource) return;
 
+        // Clear existing features
         vectorSource.clear();
 
         // Add features for locations
         locations.forEach(location => {
-            const feature = new Feature({
-                geometry: new Point(fromLonLat([location.longitude, location.latitude])),
-                name: `${location.description} (${location.owner})`,
-                location: location,
-            });
+            if (location.latitude && location.longitude) {
+                const feature = new Feature({
+                    geometry: new Point(fromLonLat([location.longitude, location.latitude])),
+                    name: `${location.description} (${location.owner})`,
+                    location: location,
+                });
+                if (location.id) {
+                    feature.setId(location.id);
+                }
+                vectorSource.addFeature(feature);
+            }
+        });
 
-            // Set style for the feature
+        // Update style for all features
+        vectorSource.getFeatures().forEach(feature => {
+            const loc = feature.get('location');
             feature.setStyle(new Style({
                 image: new Circle({
-                    radius: selectedLocation && selectedLocation.id === location.id ? 8 : 6,
-                    fill: new Fill({ color: selectedLocation && selectedLocation.id === location.id ? '#e74c3c' : '#3498db' }),
+                    radius: selectedLocation && selectedLocation.id === loc.id ? 8 : 6,
+                    fill: new Fill({ color: selectedLocation && selectedLocation.id === loc.id ? '#e74c3c' : '#3498db' }),
                     stroke: new Stroke({ color: '#fff', width: 2 })
                 }),
                 text: new Text({
@@ -79,8 +89,6 @@ const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapCli
                     stroke: new Stroke({ color: '#fff', width: 3 })
                 })
             }));
-
-            vectorSource.addFeature(feature);
         });
 
         // Add feature for new location if coordinates are set
@@ -101,7 +109,7 @@ const MapView: React.FC<MapViewProps> = ({ locations, selectedLocation, onMapCli
         }
 
         // Animate to selected location if exists
-        if (selectedLocation) {
+        if (selectedLocation && selectedLocation.latitude && selectedLocation.longitude) {
             mapInstance.current.getView().animate({
                 center: fromLonLat([selectedLocation.longitude, selectedLocation.latitude]),
                 zoom: 8,

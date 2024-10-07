@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Datelike, Duration, Utc};
 use kinode_process_lib::{
+    get_state, set_state,
     sqlite::{self, Sqlite},
     Address, NodeId, ProcessId, Request,
 };
@@ -56,22 +57,32 @@ pub struct State {
 impl State {
     pub fn new(our: &Address) -> Result<Self> {
         let cities = load_cities_from_file(our).expect("Failed to load cities json");
+
+        let saved_state: SavedState = if let Some(state_bytes) = get_state() {
+            serde_json::from_slice(&state_bytes)?
+        } else {
+            SavedState::default()
+        };
+
         Ok(Self {
             db: DB::connect(our)?,
-            friends: HashMap::new(),
-            pending_friend_requests: Vec::new(),
-            custom_lists: HashMap::new(),
+            friends: saved_state.friends,
+            pending_friend_requests: saved_state.pending_friend_requests,
+            custom_lists: saved_state.custom_lists,
             geo_protocol: GranularityProtocol::new(cities),
         })
     }
 
-    pub fn add_location(&mut self, location: Location) -> Result<()> {
-        self.db.insert_location(&location)?;
+    pub fn add_location(&mut self, location: &Location) -> Result<()> {
+        self.db.insert_location(location)?;
+        Ok(())
+    }
 
+    pub fn share_location(&mut self, location: &Location) -> Result<()> {
         for friend in self.friends.values() {
             let fuzzed_location = self
                 .geo_protocol
-                .fuzz_location(&location, &friend.friend_type);
+                .fuzz_location(location, &friend.friend_type);
             let req = RemoteRequest::Sync {
                 locations: vec![fuzzed_location],
             };
@@ -136,6 +147,8 @@ impl State {
         .body(serde_json::to_vec(&RemoteRequest::FriendResponse).unwrap())
         .send()
         .unwrap();
+
+        let _ = self.save();
     }
 
     pub fn send_friend_request(&mut self, node_id: NodeId, friend_type: FriendType) {
@@ -155,6 +168,7 @@ impl State {
         .body(serde_json::to_vec(&RemoteRequest::FriendRequest).unwrap())
         .send()
         .unwrap();
+        let _ = self.save();
     }
 
     pub fn add_pending_friend_request(&mut self, node_id: NodeId) {
@@ -166,6 +180,7 @@ impl State {
             },
             false, // is_local
         ));
+        let _ = self.save();
     }
 
     pub fn accept_friend_request(
@@ -199,6 +214,7 @@ impl State {
             .position(|(friend, _)| friend.node_id == node_id)
         {
             self.pending_friend_requests.remove(index);
+            let _ = self.save();
         }
     }
 
@@ -245,6 +261,7 @@ impl State {
         for list in self.custom_lists.values_mut() {
             list.retain(|id| id != node_id);
         }
+        let _ = self.save();
     }
 
     pub fn get_friend(&self, node_id: &NodeId) -> Option<&Friend> {
@@ -256,6 +273,7 @@ impl State {
             .entry(list_name)
             .or_default()
             .push(node_id);
+        let _ = self.save();
     }
 
     pub fn remove_from_custom_list(&mut self, list_name: &str, node_id: &NodeId) {
@@ -267,6 +285,25 @@ impl State {
     pub fn get_custom_list(&self, list_name: &str) -> Option<&Vec<NodeId>> {
         self.custom_lists.get(list_name)
     }
+
+    pub fn save(&self) -> Result<()> {
+        let saved_state = SavedState {
+            friends: self.friends.clone(),
+            pending_friend_requests: self.pending_friend_requests.clone(),
+            custom_lists: self.custom_lists.clone(),
+        };
+        let bytes = serde_json::to_vec(&saved_state)?;
+        set_state(&bytes);
+        Ok(())
+    }
+}
+
+// helper struct to not save DB and in-memory structs.
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct SavedState {
+    pub friends: Friends,
+    pub pending_friend_requests: PendingFriendRequests,
+    pub custom_lists: CustomLists,
 }
 
 pub struct DB {

@@ -127,14 +127,19 @@ fn handle_remote_message(our: &Address, message: Message, state: &mut State) -> 
             println!("Received sync data for {} locations", locations.len());
 
             for location in locations {
-                state.add_location(location)?;
+                if location.owner == sender {
+                    state.add_location(&location)?;
+                } else {
+                    println!(
+                        "Received location from unknown sender: {} with owner {}",
+                        sender, location.owner
+                    );
+                }
             }
-            // push notifs?
         }
         RemoteRequest::FriendRequest => {
             println!("Received friend request from {}", sender);
             state.add_pending_friend_request(sender);
-            // push notifs here would be pretty cool no?
         }
         RemoteRequest::FriendResponse => {
             println!("Received friend response from {}", sender);
