@@ -1,20 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
+import { Location } from '../store';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 moment.locale('en-GB');
 const localizer = momentLocalizer(moment);
 
-interface Location {
-    id: string;
-    description: string;
-    latitude: number;
-    longitude: number;
-    owner: string;
-    start_date: number;
-    end_date: number;
-}
 
 interface CalendarViewProps {
     locations: Location[];

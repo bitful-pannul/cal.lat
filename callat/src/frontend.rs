@@ -103,8 +103,6 @@ fn handle_get_locations(
         _ => state.db.get_all_locations()?,
     };
 
-    println!("locations: {:?}", locations);
-
     ok_response(&locations)
 }
 
@@ -124,6 +122,7 @@ fn handle_add_location(
         latitude: new_location.latitude,
         longitude: new_location.longitude,
         owner: our.node().to_string(),
+        photos: new_location.photos,
     };
 
     println!("adding location: {:?}", location);
@@ -350,6 +349,8 @@ fn error_response(error: anyhow::Error) -> (http::server::HttpResponse, Option<L
     } else {
         http::StatusCode::INTERNAL_SERVER_ERROR
     };
+
+    println!("HTTPerror: {:?}", error);
 
     (
         http::server::HttpResponse::new(status),

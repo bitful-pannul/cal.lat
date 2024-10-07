@@ -7,9 +7,6 @@ interface SidebarProps {
     setSelectedLocation: (location: Location | null) => void;
     showNewLocationPopup: boolean;
     setShowNewLocationPopup: (show: boolean) => void;
-    newLocation: any;
-    setNewLocation: (location: any) => void;
-    handleNewLocationSubmit: (e: React.FormEvent) => void;
     formatDate: (timestamp: number) => string;
 }
 
@@ -30,6 +27,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <h3>{selectedLocation.owner}: {selectedLocation.description}</h3>
                     <p>Coordinates: ({selectedLocation.latitude.toFixed(4)}, {selectedLocation.longitude.toFixed(4)})</p>
                     <p>Date: {formatDate(selectedLocation.start_date)} - {formatDate(selectedLocation.end_date)}</p>
+                    {selectedLocation.photos.length > 0 && (
+                        <div className="photo-gallery">
+                            {selectedLocation.photos.map((photo, index) => (
+                                <img
+                                    key={index}
+                                    src={`data:image/jpeg;base64,${photo}`}
+                                    alt={`Photo ${index + 1}`}
+                                    className="location-photo"
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             ) : (
                 <ul className="locations-list">
@@ -39,11 +48,24 @@ const Sidebar: React.FC<SidebarProps> = ({
                             className="location-item"
                             onClick={() => setSelectedLocation(location)}
                         >
-                            <strong>{location.description}</strong>
-                            <br />
-                            <em>{location.owner}</em>
-                            <br />
-                            {formatDate(location.start_date)} - {formatDate(location.end_date)}
+                            {location.photos.length > 0 && (
+                                <img
+                                    src={`data:image/jpeg;base64,${location.photos[0]}`}
+                                    alt="Location thumbnail"
+                                    className="location-thumbnail"
+                                />
+                            )}
+                            <div className="location-info">
+                                <strong>{location.description}</strong>
+                                <br />
+                                <em>{location.owner}</em>
+                                <br />
+                                {formatDate(location.start_date)} - {formatDate(location.end_date)}
+                                <br />
+                                {location.photos.length > 0 && (
+                                    <span>{location.photos.length} photo{location.photos.length > 1 ? 's' : ''}</span>
+                                )}
+                            </div>
                         </li>
                     ))}
                 </ul>

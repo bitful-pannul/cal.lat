@@ -24,6 +24,7 @@ pub struct Location {
     pub description: String,
     pub latitude: f64,
     pub longitude: f64,
+    pub photos: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -280,7 +281,7 @@ impl DB {
     }
 
     pub fn insert_location(&self, location: &Location) -> Result<()> {
-        let query = "INSERT INTO locations (uuid, start_date, end_date, owner, description, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        let query = "INSERT INTO locations (uuid, start_date, end_date, owner, description, latitude, longitude, photos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         let params = vec![
             location.uuid.to_string().into(),
             location.start_date.into(),
@@ -289,19 +290,21 @@ impl DB {
             location.description.clone().into(),
             location.latitude.into(),
             location.longitude.into(),
+            serde_json::to_string(&location.photos)?.into(),
         ];
         self.inner.write(query.to_string(), params, None)?;
         Ok(())
     }
 
     pub fn update_location(&self, location: &Location) -> Result<()> {
-        let query = "UPDATE locations SET start_date = ?, end_date = ?, description = ?, latitude = ?, longitude = ? WHERE uuid = ?";
+        let query = "UPDATE locations SET start_date = ?, end_date = ?, description = ?, latitude = ?, longitude = ?, photos = ? WHERE uuid = ?";
         let params = vec![
             location.start_date.into(),
             location.end_date.into(),
             location.description.clone().into(),
             location.latitude.into(),
             location.longitude.into(),
+            serde_json::to_string(&location.photos)?.into(),
             location.uuid.to_string().into(),
         ];
         self.inner.write(query.to_string(), params, None)?;
@@ -376,6 +379,11 @@ impl DB {
             longitude: row["longitude"]
                 .as_f64()
                 .ok_or_else(|| anyhow!("Invalid longitude"))?,
+            photos: row["photos"]
+                .as_str()
+                .map(|s| serde_json::from_str(s))
+                .transpose()?
+                .unwrap_or_default(), // Default to empty Vec if NULL
         })
     }
 }
@@ -404,6 +412,7 @@ pub struct NewLocation {
     pub description: String,
     pub latitude: f64,
     pub longitude: f64,
+    pub photos: Vec<String>,
 }
 
 const CREATE_LOCATIONS_TABLE: &str = "
@@ -414,5 +423,6 @@ CREATE TABLE IF NOT EXISTS locations (
     owner TEXT NOT NULL,
     description TEXT,
     latitude REAL NOT NULL,
-    longitude REAL NOT NULL
+    longitude REAL NOT NULL,
+    photos TEXT
 );";

@@ -4,6 +4,7 @@ import { toLonLat } from 'ol/proj';
 import DateSlider from '../components/DateSlider';
 import CalendarView from '../components/CalendarView';
 import MapView from '../components/MapView';
+import NewLocation from '../components/NewLocation';
 import { format } from 'date-fns';
 import useStore from '../store';
 import FriendList from '../components/FriendList';
@@ -19,7 +20,8 @@ function Home(): JSX.Element {
     latitude: null as number | null,
     longitude: null as number | null,
     start_date: Math.floor(Date.now() / 1000),
-    end_date: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60
+    end_date: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
+    photos: [] as string[]
   });
 
   const [activeTab, setActiveTab] = useState<'map' | 'calendar' | 'friends'>('map');
@@ -87,7 +89,8 @@ function Home(): JSX.Element {
           latitude: null,
           longitude: null,
           start_date: Math.floor(Date.now() / 1000),
-          end_date: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60
+          end_date: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
+          photos: []
         });
       }
     } catch (error) {
@@ -144,35 +147,19 @@ function Home(): JSX.Element {
           setSelectedLocation={setSelectedLocation}
           showNewLocationPopup={showNewLocationPopup}
           setShowNewLocationPopup={setShowNewLocationPopup}
-          newLocation={newLocation}
-          setNewLocation={setNewLocation}
-          handleNewLocationSubmit={handleNewLocationSubmit}
           formatDate={formatDate}
         />
+        {showNewLocationPopup && (
+          <NewLocation
+            onSubmit={handleNewLocationSubmit}
+            onCancel={() => setShowNewLocationPopup(false)}
+            onMapClick={handleMapClick}
+            newLocation={newLocation}
+            setNewLocation={setNewLocation}
+            handleNewLocationDateChange={handleNewLocationDateChange}
+          />
+        )}
       </div>
-      {showNewLocationPopup && (
-        <div className="popup">
-          <h3>Add New Location</h3>
-          <form onSubmit={handleNewLocationSubmit}>
-            <input
-              type="text"
-              value={newLocation.description}
-              onChange={(e) => setNewLocation(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Description"
-              required
-            />
-            <p>Coordinates: {newLocation.latitude !== null ? newLocation.latitude.toFixed(4) : 'Click anywhere on the map to set coordinates!'}, {newLocation.longitude !== null ? newLocation.longitude.toFixed(4) : ''}</p>
-            <p>Click on the map to set coordinates</p>
-            <DateSlider
-              startDate={new Date(newLocation.start_date * 1000)}
-              endDate={new Date(newLocation.end_date * 1000)}
-              onChange={handleNewLocationDateChange}
-            />
-            <button type="submit">Add Location</button>
-            <button type="button" onClick={() => setShowNewLocationPopup(false)}>Cancel</button>
-          </form>
-        </div>
-      )}
     </div>
   );
 }

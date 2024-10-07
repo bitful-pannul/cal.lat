@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { addYears } from 'date-fns';
 
 export interface Location {
     id: string;
@@ -8,6 +9,7 @@ export interface Location {
     owner: string;
     start_date: number;
     end_date: number;
+    photos: string[];
 }
 
 export interface DateRange {
@@ -56,8 +58,8 @@ const useStore = create<AppState>((set, get) => ({
     locations: [],
     selectedLocation: null,
     dateRange: {
-        start: new Date(2024, 0, 1),
-        end: new Date(2024, 11, 31),
+        start: new Date(),
+        end: addYears(new Date(), 1),
     },
     friends: [],
     pendingRequests: [],
