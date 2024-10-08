@@ -4,7 +4,6 @@ import { toLonLat } from 'ol/proj';
 import DateSlider from '../components/DateSlider';
 import CalendarView from '../components/CalendarView';
 import MapView from '../components/MapView';
-import NewLocation from '../components/NewLocation';
 import { format } from 'date-fns';
 import useStore from '../store';
 import FriendList from '../components/FriendList';

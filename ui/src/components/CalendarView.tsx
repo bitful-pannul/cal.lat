@@ -66,26 +66,33 @@ const CalendarView: React.FC<CalendarViewProps> = ({ locations, onSelectLocation
                             width: '100%',
                         }}
                     >
-                        {locations.map((location, index) => (
-                            <div
-                                key={location.id}
-                                className="waterfall-item"
-                                style={{
-                                    top: `${index * 30}px`,
-                                    left: `${((location.start_date - minDate) / totalSeconds) * 100}%`,
-                                    width: `${((location.end_date - location.start_date) / totalSeconds) * 100}%`,
-                                }}
-                                onClick={() => onSelectLocation(location)}
-                                title={`Owner: ${location.owner}\nDescription: ${location.description}`}
-                            >
-                                <span className="waterfall-item-content">
-                                    {location.owner}: {location.description}
-                                    <span className="date-range">
-                                        {moment(location.start_date * 1000).format('MMM D')} - {moment(location.end_date * 1000).format('MMM D')}
+                        {locations.map((location, index) => {
+                            const start = Math.max(location.start_date, minDate);
+                            const end = Math.min(location.end_date, maxDate);
+                            const leftPosition = ((start - minDate) / totalSeconds) * 100;
+                            const width = ((end - start) / totalSeconds) * 100;
+
+                            return (
+                                <div
+                                    key={location.id}
+                                    className="waterfall-item"
+                                    style={{
+                                        top: `${index * 30}px`,
+                                        left: `${leftPosition}%`,
+                                        width: `${width}%`,
+                                    }}
+                                    onClick={() => onSelectLocation(location)}
+                                    title={`Owner: ${location.owner}\nDescription: ${location.description}`}
+                                >
+                                    <span className="waterfall-item-content">
+                                        {location.owner}: {location.description}
+                                        <span className="date-range">
+                                            {moment(location.start_date * 1000).format('MMM D')} - {moment(location.end_date * 1000).format('MMM D')}
+                                        </span>
                                     </span>
-                                </span>
-                            </div>
-                        ))}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>

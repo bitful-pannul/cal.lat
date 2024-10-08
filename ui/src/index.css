@@ -311,7 +311,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 50px;
+  min-width: 2px;
+  display: flex;
+  align-items: center;
 }
 
 .waterfall-date-range {
@@ -327,10 +329,23 @@
 }
 
 .waterfall-item-content {
-  display: inline-block;
-  max-width: 100%;
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.waterfall-item:hover .waterfall-item-content {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 2px 4px;
+  border-radius: 3px;
+  z-index: 10;
+  width: auto;
+  max-width: none;
+  overflow: visible;
 }
 
 .date-range {
